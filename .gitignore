@@ -1,0 +1,23 @@
+# Environment secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Database
+*.db
+*.db-*
+
+# IDE
+.vscode/
+.idea/
+
+# Large Datasets, Models, and Training Logs
+data/
+logs/
+runs/
+*.pt
+*.tiff
+*-1/
