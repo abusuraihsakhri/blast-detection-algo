@@ -1,10 +1,10 @@
 """
 Download and register Roboflow datasets for the warm-start build.
 
-This script downloads the curated set of Roboflow Universe datasets
-required to bootstrap the blast detection model with strong baseline
-knowledge. After downloading, each dataset is automatically registered
-into the SQLite database for the Experience Replay Buffer.
+This script downloads the configured Roboflow Universe datasets used by
+the warm-start workflow. After downloading, each dataset is registered in
+SQLite as source-dataset provenance metadata. Incremental replay uses the
+reviewed Tile/Annotation tables instead.
 
 Datasets:
     1. leukemia-nfxzn  (v1) — Blast-subtype detection  (Benign/Early/Pre/Pro)
@@ -51,16 +51,9 @@ from import_historical_data import ingest_dataset  # noqa: E402
 # Each entry maps to a Roboflow Universe project. The class_map shows
 # how the dataset's YOLO class IDs relate to our project's taxonomy.
 #
-#   Project Taxonomy (config.py):
-#       0: blast
-#       1: lymphocyte
-#       2: rbc
-#       3: artifact
-#
-#   These datasets span the spectrum from baseline blood-cell morphology
-#   (broad distribution) to specialized blast-subtype detection (narrow,
-#   high-value distribution), which together give the model a strong
-#   warm start before any HITL annotations begin.
+# Source class IDs are dataset-specific. The remapping used for warm-start
+# training is defined in training_pipeline.py and must be checked against
+# the exact dataset version before scientific use.
 
 DATASET_REGISTRY = [
     {
@@ -408,16 +401,6 @@ def main() -> None:
     session = SessionLocal()
     try:
         total_records = session.query(AnnotationRecord).count()
-        datasets = (
-            session.query(
-                AnnotationRecord.dataset_name,
-                AnnotationRecord.dataset_name,
-            )
-            .distinct()
-            .all()
-        )
-        dataset_names = [d[0] for d in datasets]
-
         # Count per dataset
         from sqlalchemy import func
 
@@ -438,8 +421,8 @@ def main() -> None:
     print(f"  Total records: {total_records}")
     for ds_name, count in dataset_counts:
         print(f"    • {ds_name}: {count} images")
-    print(f"\n  🚀 Warm-start data pipeline complete.")
-    print(f"     The Experience Replay Buffer is ready for training.")
+    print(f"\n  Warm-start dataset preparation complete.")
+    print(f"     Source-dataset provenance is recorded for inspection.")
     print(f"{'═' * 65}")
 
 
