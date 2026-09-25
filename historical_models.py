@@ -1,11 +1,10 @@
 """
 Lightweight ORM model for tracking historical YOLO datasets.
 
-This AnnotationRecord table serves the Experience Replay Buffer by indexing
-which images exist on disk, what YOLO class IDs they contain, and which
-dataset they belong to. It supplements the core models in models.py —
-those handle tiles/annotations from the HITL pipeline, while this table
-tracks pre-existing downloaded datasets.
+This AnnotationRecord table catalogs downloaded YOLO source datasets:
+which images and label files exist on disk, which class IDs they contain,
+and which dataset they belong to. It is separate from the Tile/Annotation
+tables used by the review UI and incremental replay workflow.
 
 Security Notes:
     - image_path / label_path are validated at ingestion time to prevent
@@ -30,9 +29,8 @@ class AnnotationRecord(Base):
         image_path: Absolute path to the image file on disk.
         label_path: Absolute path to the corresponding YOLO .txt label file.
         contained_classes: Comma-separated YOLO class IDs found in the label
-                           file (e.g. "0,2,3"). Critical for stratified
-                           sampling in the Replay Buffer.
-        is_historical: True for downloaded datasets, False for UI-annotated.
+                           file (e.g. "0,2,3") for provenance and inspection.
+        is_historical: True for downloaded source-dataset records.
         dataset_name: Identifier for the source dataset (e.g. "leukemia-nfxzn").
         timestamp: When this record was ingested.
     """
