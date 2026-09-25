@@ -31,6 +31,7 @@
       </a>
 
       <nav class="nav-links" aria-label="Primary Navigation">
+        <a class="nav-link" href="#downloads">Model Releases</a>
         <a class="nav-link" href="#results">Validation Results</a>
         <a class="nav-link" href="#visualizer">Curve Visualizer</a>
         <a class="nav-link" href="#datalake">Datalake</a>
@@ -76,13 +77,21 @@
         <p class="hero-lede">A PyTorch and YOLOv8n pipeline trained on <strong>25,875 microscopy fields</strong> with <strong>115,548 expert-annotated cells</strong> across 6 research cohorts. Features automated whole slide image (WSI) sliding-window tiling, multi-class blast morphology classification, and experience replay active learning.</p>
         
         <div class="hero-actions">
-          <a class="btn-primary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">
+          <a class="btn-primary" href="#downloads">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
             <span>Download Weights (v1.0.0)</span>
+          </a>
+          <a class="btn-secondary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/best.pt" target="_blank" rel="noopener noreferrer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Direct best.pt</span>
           </a>
           <a class="btn-secondary" href="#visualizer">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -104,7 +113,7 @@
         <div class="hud-header">
           <div class="hud-status">
             <span class="live-indicator"></span>
-            <span>Active Checkpoint: active_model.pt</span>
+            <span>Checkpoints: best.pt & active_model.pt</span>
           </div>
           <span class="hud-tag">YOLOv8n</span>
         </div>
@@ -144,6 +153,120 @@
           </div>
         </div>
       </aside>
+    </div>
+  </section>
+
+  <!-- SECTION: MODEL RELEASES & DOWNLOADS -->
+  <section id="downloads" class="section-container">
+    <div class="section-header">
+      <div class="section-eyebrow">OFFICIAL MODEL CHECKPOINTS & ARTIFACTS</div>
+      <h2 class="section-title">Pretrained YOLOv8n Checkpoints (Release v1.0.0)</h2>
+      <p class="section-lede">Both raw training checkpoints and deployment inference weights are published as verifiable GitHub Release assets. Both files share the identical bitwise SHA-256 fingerprint generated at peak validation mAP@50 (92.23%).</p>
+    </div>
+
+    <div class="release-cards-grid">
+      <!-- Card 1: best.pt -->
+      <div class="release-card highlight-card">
+        <div class="release-card-badge">Top Training Checkpoint</div>
+        <div class="release-card-header">
+          <div class="file-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="12" y1="18" x2="12" y2="12"></line>
+              <line x1="9" y1="15" x2="15" y2="15"></line>
+            </svg>
+          </div>
+          <div>
+            <h3 class="release-filename">best.pt</h3>
+            <span class="release-filesize">6.25 MB (6,249,130 bytes) · PyTorch</span>
+          </div>
+        </div>
+        <p class="release-card-desc">The top-performing weights saved during warm-start training at epoch 10. Standard filename for Ultralytics pipelines, research reproduction, and transfer learning.</p>
+        
+        <div class="checksum-box">
+          <div class="checksum-label">SHA-256 Checksum:</div>
+          <code class="checksum-value">c20dc36fcf15823b95ae967f24a27c6797c4d9649d1e48f949f5fb520de4df10</code>
+        </div>
+
+        <div class="release-card-actions">
+          <a class="btn-primary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/best.pt" target="_blank" rel="noopener noreferrer">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download best.pt</span>
+          </a>
+          <a class="btn-github" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">
+            <span>Release Notes</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Card 2: active_model.pt -->
+      <div class="release-card">
+        <div class="release-card-badge muted">Production Runtime Asset</div>
+        <div class="release-card-header">
+          <div class="file-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="12" y1="18" x2="12" y2="12"></line>
+              <line x1="9" y1="15" x2="15" y2="15"></line>
+            </svg>
+          </div>
+          <div>
+            <h3 class="release-filename">active_model.pt</h3>
+            <span class="release-filesize">6.25 MB (6,249,130 bytes) · PyTorch</span>
+          </div>
+        </div>
+        <p class="release-card-desc">The deployment checkpoint bundled at <code>data/models/active_model.pt</code>, loaded by default by the FastAPI review sandbox and sliding-window WSI tiler.</p>
+        
+        <div class="checksum-box">
+          <div class="checksum-label">SHA-256 Checksum:</div>
+          <code class="checksum-value">c20dc36fcf15823b95ae967f24a27c6797c4d9649d1e48f949f5fb520de4df10</code>
+        </div>
+
+        <div class="release-card-actions">
+          <a class="btn-secondary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/active_model.pt" target="_blank" rel="noopener noreferrer">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download active_model.pt</span>
+          </a>
+          <a class="btn-github" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">
+            <span>Release Notes</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Download Command Snippet -->
+    <div class="cli-box">
+      <div class="cli-box-header">
+        <div class="cli-box-title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          <span>One-Line CLI Download & Checksum Verification</span>
+        </div>
+      </div>
+      <div class="cli-box-body">
+<pre><code># 1. Download best.pt directly via curl
+curl -L -O https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/best.pt
+
+# 2. Or download via GitHub CLI
+gh release download v1.0.0 -p "best.pt"
+
+# 3. Verify SHA-256 hash matches
+# Expected: c20dc36fcf15823b95ae967f24a27c6797c4d9649d1e48f949f5fb520de4df10
+certutil -hashfile best.pt SHA256   # On Windows
+sha256sum best.pt                   # On Linux / macOS</code></pre>
+      </div>
     </div>
   </section>
 
@@ -582,7 +705,7 @@
     <div class="section-header">
       <div class="section-eyebrow">DEVELOPER INTEGRATION</div>
       <h2 class="section-title">Quickstart & Pipeline Execution</h2>
-      <p class="section-lede">The weights are included in the repository at <code>data/models/active_model.pt</code> and can be loaded directly with standard Ultralytics YOLO or via the integrated pipeline scripts.</p>
+      <p class="section-lede">The weights are pre-bundled in the repository at <code>data/models/active_model.pt</code> and can also be downloaded directly as <code>best.pt</code> from GitHub Releases for inference with Ultralytics YOLO or the custom WSI pipeline.</p>
     </div>
 
     <div class="code-container">
@@ -617,8 +740,10 @@ source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 # 4. Check active model weights (pre-loaded in repository)
-# Located at data/models/active_model.pt (6.25 MB, YOLOv8n, 10 classes)
-ls -lh data/models/active_model.pt</code></pre>
+ls -lh data/models/active_model.pt
+
+# Option: Or fetch best.pt directly from GitHub Release v1.0.0
+curl -L -O https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/best.pt</code></pre>
         </div>
 
         <!-- CODE 2: PYTHON INFERENCE -->
@@ -626,8 +751,8 @@ ls -lh data/models/active_model.pt</code></pre>
 <pre><code>from ultralytics import YOLO
 import cv2
 
-# Load the trained model checkpoint
-model = YOLO("data/models/active_model.pt")
+# Load the trained model checkpoint (best.pt or active_model.pt)
+model = YOLO("data/models/active_model.pt")  # or YOLO("best.pt")
 
 # Run inference on a blood smear field
 results = model.predict(
