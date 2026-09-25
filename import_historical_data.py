@@ -9,12 +9,11 @@ metadata. Incremental replay uses reviewed Tile/Annotation records instead.
 Usage:
     python import_historical_data.py
 
-Security Notes:
-    - All file paths are resolved to absolute, canonical forms to prevent
-      directory-traversal issues when later consumed.
+Notes:
+    - File paths are resolved to canonical absolute paths for provenance.
+    - The caller is responsible for choosing an appropriate dataset root.
     - Duplicate detection uses the unique constraint on image_path.
-    - Label files are read in text mode with explicit encoding to avoid
-      codec-based injection vectors.
+    - Label files are read in text mode with explicit UTF-8 encoding.
 """
 
 from __future__ import annotations
