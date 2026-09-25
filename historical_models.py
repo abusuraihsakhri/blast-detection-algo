@@ -6,12 +6,11 @@ which images and label files exist on disk, which class IDs they contain,
 and which dataset they belong to. It is separate from the Tile/Annotation
 tables used by the review UI and incremental replay workflow.
 
-Security Notes:
-    - image_path / label_path are validated at ingestion time to prevent
-      path-traversal when later consumed by the replay buffer.
+Notes:
+    - image_path / label_path are stored as resolved absolute paths for provenance.
+    - These records are not consumed by the incremental replay workflow.
     - All queries use parameterised SQLAlchemy; no raw SQL.
-    - String columns have no unbounded lengths — SQLite doesn't enforce
-      them, but the constraint documents intent.
+    - String lengths document intended limits even though SQLite does not enforce them.
 """
 
 import datetime
