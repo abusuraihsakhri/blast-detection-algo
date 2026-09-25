@@ -1,42 +1,24 @@
-# ============================================================
-# HITL Active Learning Pipeline — Blast Detection
-# Python 3.10+
-# ============================================================
-
-# --- Backend / API ---
-fastapi==0.115.6
+fastapi==0.141.1
 uvicorn[standard]==0.34.0
-python-multipart==0.0.19
+python-multipart==0.0.32
 websockets==14.1
 aiofiles==24.1.0
 pydantic==2.10.4
 pydantic-settings==2.7.1
-
-# --- Database ---
 sqlalchemy==2.0.36
 alembic==1.14.1
-
-# --- Deep Learning / Vision ---
-torch==2.5.1
-torchvision==0.20.1
-ultralytics==8.3.52
-
-# --- WSI Processing ---
+torch==2.14.0
+torchvision==0.29.0
+ultralytics==8.4.162
 tiffslide==2.4.0
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
-Pillow==11.0.0
+Pillow==12.3.0
 scikit-image==0.24.0
-
-# --- Data Acquisition ---
 roboflow>=1.1.0
-
-# --- Utilities ---
 pyyaml==6.0.2
-python-dotenv==1.0.1
+python-dotenv==1.2.3
 loguru==0.7.3
-
-# --- Testing ---
-pytest==8.3.4
-pytest-asyncio==0.24.0
+pytest==9.1.1
+pytest-asyncio==1.4.0
 httpx==0.28.1

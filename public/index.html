@@ -1,177 +1,137 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blast Detection — AL Engine</title>
-    <meta name="description" content="Human-in-the-Loop Active Learning and Sandbox Inference for Pathology Blast Detection">
-    <!-- Modern Geometry Font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="static/styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Local pathology review interface for blast-detection active learning and sandbox inference.">
+  <title>Blast Detection Review</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="app-layout">
-        <header class="app-header glass">
-            <div class="logo">
-                <span class="pulse-indicator"></span>
-                <h1>Blast Detection <span>AL Engine</span></h1>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>Blast Detection</h1>
+          <p>Review &amp; annotation workspace</p>
+        </div>
+      </div>
+
+      <div class="mode-switcher" role="group" aria-label="Workspace mode">
+        <button id="mode-al" class="mode-btn active" type="button" aria-pressed="true">Review queue</button>
+        <button id="mode-sandbox" class="mode-btn" type="button" aria-pressed="false">Sandbox</button>
+      </div>
+
+      <div class="header-actions">
+        <span id="tile-status" class="status-pill" aria-live="polite">Starting…</span>
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Switch to dark theme" title="Switch theme">◐</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="viewer-card" aria-label="Image viewer">
+        <div class="canvas-container" id="canvas-container">
+          <canvas id="image-canvas" aria-label="Pathology image"></canvas>
+          <canvas id="overlay-canvas" aria-label="Bounding-box annotation layer"></canvas>
+
+          <button id="dropzone" class="dropzone hidden" type="button">
+            <span class="drop-icon" aria-hidden="true">↑</span>
+            <strong>Drop an image here</strong>
+            <span>or select a local image</span>
+            <small>JPG, PNG, BMP or WebP</small>
+          </button>
+
+          <div id="inference-spinner" class="spinner-overlay hidden" role="status" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Running inference…</span>
+          </div>
+        </div>
+
+        <div id="al-toolbar" class="toolbar">
+          <div class="segmented" role="group" aria-label="Review tools">
+            <button id="tool-draw" class="tool-btn active" type="button">Draw</button>
+            <button id="tool-move" class="tool-btn" type="button">Select / move</button>
+          </div>
+          <span class="toolbar-spacer"></span>
+          <button id="btn-clear" class="tool-btn danger" type="button">Clear boxes</button>
+        </div>
+
+        <div id="sandbox-toolbar" class="toolbar hidden">
+          <div class="segmented" role="group" aria-label="Sandbox tools">
+            <button id="sandbox-tool-draw" class="tool-btn active" type="button">Draw</button>
+            <button id="sandbox-tool-move" class="tool-btn" type="button">Select / move</button>
+          </div>
+          <span id="sandbox-filename" class="filename">No image loaded</span>
+          <span class="toolbar-spacer"></span>
+          <button id="btn-clear-sandbox" class="tool-btn danger" type="button">Reset</button>
+        </div>
+      </section>
+
+      <aside class="sidebar" aria-label="Annotation controls">
+        <div id="al-sidebar-panels" class="panel-stack">
+          <section class="panel">
+            <div class="panel-heading"><h2>Selected box</h2></div>
+            <p id="controls-empty" class="empty-state">Select a box to edit its class.</p>
+            <div id="controls-active" class="hidden">
+              <label for="class-select">Class</label>
+              <select id="class-select"></select>
+              <button id="btn-delete-box" class="secondary danger" type="button">Delete box</button>
             </div>
-            <div class="mode-switcher">
-                <button id="mode-al" class="mode-btn active">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
-                    Active Learning
-                </button>
-                <button id="mode-sandbox" class="mode-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    Sandbox Inference
-                </button>
+          </section>
+          <section class="panel compact">
+            <div class="panel-heading"><h2>Tile</h2></div>
+            <dl class="stats-list">
+              <div><dt>ID</dt><dd id="stat-id">—</dd></div>
+              <div><dt>Boxes</dt><dd id="stat-boxes">0</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <div id="sandbox-sidebar-panels" class="panel-stack hidden">
+          <section class="panel">
+            <div class="panel-heading"><h2>Selected detection</h2></div>
+            <p id="sandbox-controls-empty" class="empty-state">Select a visible box to edit it.</p>
+            <div id="sandbox-controls-active" class="hidden">
+              <label for="sandbox-class-select">Class</label>
+              <select id="sandbox-class-select"></select>
+              <button id="btn-delete-sandbox-box" class="secondary danger" type="button">Delete detection</button>
             </div>
-            <div class="header-stats" id="tile-status">
-                Loading Next Tile...
+          </section>
+
+          <section class="panel compact">
+            <div class="panel-heading"><h2>Detections</h2></div>
+            <p id="sandbox-results-empty" class="empty-state">Upload an image to run the local model.</p>
+            <div id="sandbox-results-list" class="hidden">
+              <dl class="stats-list">
+                <div><dt>Model output</dt><dd id="sandbox-det-count">0</dd></div>
+                <div><dt>Visible</dt><dd id="sandbox-vis-count">0</dd></div>
+              </dl>
+              <div id="sandbox-breakdown" class="detection-breakdown"></div>
             </div>
-        </header>
+          </section>
 
-        <main class="main-content">
-            <!-- Left Side: Canvas Viewer -->
-            <div class="viewer-section glass">
-                <div class="canvas-container" id="canvas-container">
-                    <canvas id="image-canvas"></canvas>
-                    <canvas id="overlay-canvas"></canvas>
+          <section class="panel compact">
+            <div class="panel-heading"><h2>Confidence</h2><output id="conf-value" for="conf-slider">0.25</output></div>
+            <input id="conf-slider" class="conf-slider" type="range" min="0" max="100" value="25" aria-label="Minimum detection confidence">
+          </section>
+        </div>
 
-                    <!-- Drag-and-Drop zone for Sandbox mode -->
-                    <div id="dropzone" class="dropzone hidden">
-                        <div class="dropzone-inner">
-                            <svg class="dropzone-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="17 8 12 3 7 8"></polyline>
-                                <line x1="12" y1="3" x2="12" y2="15"></line>
-                            </svg>
-                            <h3>Drop Image Here</h3>
-                            <p>or click <strong>"Upload Image"</strong> below</p>
-                            <p class="dropzone-hint">Supports JPG, PNG, BMP, TIFF</p>
-                        </div>
-                    </div>
-
-                    <!-- Loading spinner overlay -->
-                    <div id="inference-spinner" class="spinner-overlay hidden">
-                        <div class="spinner-ring"></div>
-                        <p>Running Inference...</p>
-                    </div>
-                </div>
-
-                <!-- AL Toolbar -->
-                <div class="viewer-toolbar" id="al-toolbar">
-                    <button id="tool-draw" class="tool-btn active">Draw Box</button>
-                    <button id="tool-move" class="tool-btn">Select/Move</button>
-                    <div class="spacer"></div>
-                    <button id="btn-clear" class="tool-btn danger">Clear All</button>
-                </div>
-
-                <!-- Sandbox Toolbar -->
-                <div class="viewer-toolbar hidden" id="sandbox-toolbar">
-                    <button id="sandbox-tool-draw" class="tool-btn active">Draw Box</button>
-                    <button id="sandbox-tool-move" class="tool-btn">Select/Move</button>
-                    <div class="spacer"></div>
-                    <span class="toolbar-label" id="sandbox-filename">No image loaded</span>
-                    <div class="spacer"></div>
-                    <button id="btn-clear-sandbox" class="tool-btn danger">Clear All</button>
-                </div>
-            </div>
-
-            <!-- Right Side: Controls and Object properties -->
-            <div class="sidebar glass">
-                <!-- AL Mode Panels -->
-                <div id="al-sidebar-panels">
-                    <div class="panel-section">
-                        <h2>Selected Box</h2>
-                        <div class="selected-box-controls" id="controls-empty">
-                            <p class="empty-state">Select a bounding box to edit</p>
-                        </div>
-                        <div class="selected-box-controls hidden" id="controls-active">
-                            <label for="class-select">Class Designation</label>
-                            <select id="class-select" class="modern-select">
-                                <!-- Populated dynamically via config -->
-                            </select>
-                            <button id="btn-delete-box" class="btn-warn">Delete Box</button>
-                        </div>
-                    </div>
-
-                    <div class="panel-section stats-panel">
-                        <h2>Tile Info</h2>
-                        <ul class="stats-list" id="stats-list">
-                            <li>ID: <span id="stat-id">-</span></li>
-                            <li>Boxes: <span id="stat-boxes">0</span></li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Sandbox Mode Panels -->
-                <div id="sandbox-sidebar-panels" class="hidden">
-                    <!-- Sandbox box editor -->
-                    <div class="panel-section">
-                        <h2>Selected Detection</h2>
-                        <div id="sandbox-controls-empty">
-                            <p class="empty-state">Click a detection to edit its label</p>
-                        </div>
-                        <div id="sandbox-controls-active" class="hidden">
-                            <label for="sandbox-class-select">Correct Class</label>
-                            <select id="sandbox-class-select" class="modern-select">
-                                <!-- Populated dynamically -->
-                            </select>
-                            <button id="btn-delete-sandbox-box" class="btn-warn">Delete Detection</button>
-                        </div>
-                    </div>
-
-                    <div class="panel-section">
-                        <h2>Inference Results</h2>
-                        <div id="sandbox-results-empty">
-                            <p class="empty-state">Upload an image to see model predictions</p>
-                        </div>
-                        <div id="sandbox-results-list" class="hidden">
-                            <ul class="stats-list" id="sandbox-stats">
-                                <li>Total Detections: <span id="sandbox-det-count">0</span></li>
-                                <li>Visible (filtered): <span id="sandbox-vis-count">0</span></li>
-                            </ul>
-                            <div class="detection-breakdown" id="sandbox-breakdown"></div>
-                        </div>
-                    </div>
-
-                    <div class="panel-section">
-                        <h2>Confidence Filter</h2>
-                        <div class="conf-slider-wrap">
-                            <input type="range" id="conf-slider" min="0" max="100" value="25" class="conf-slider">
-                            <span id="conf-value" class="conf-value">0.25</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bottom Action Panel (shared) -->
-                <div class="panel-section action-panel">
-                    <div id="al-actions">
-                        <button id="btn-save" class="btn-primary" disabled>
-                            <span>Save &amp; Next</span>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                        </button>
-                    </div>
-                    <div id="sandbox-actions" class="hidden">
-                        <input type="file" id="file-upload" accept="image/*" style="display: none;">
-                        <button id="btn-save-corrections" class="btn-primary btn-success" disabled>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                            <span>Save Corrections &amp; Learn</span>
-                        </button>
-                        <button id="btn-upload" class="btn-secondary">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            <span>Upload New Image</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <!-- The actual core logic -->
-    <script src="static/app.js"></script>
+        <section class="panel action-panel">
+          <div id="al-actions">
+            <button id="btn-save" class="primary" type="button" disabled>Save &amp; next</button>
+          </div>
+          <div id="sandbox-actions" class="hidden">
+            <input id="file-upload" type="file" accept="image/jpeg,image/png,image/bmp,image/webp" hidden>
+            <button id="btn-save-corrections" class="primary" type="button" disabled>Save for next training</button>
+            <button id="btn-upload" class="secondary" type="button">Choose image</button>
+          </div>
+          <p class="privacy-note">Images and annotations stay on the machine running this app.</p>
+        </section>
+      </aside>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
 </body>
 </html>

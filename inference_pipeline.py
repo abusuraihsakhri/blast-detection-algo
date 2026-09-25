@@ -1,318 +1,305 @@
-"""
-Module 5: Sliding-Window Inference Pipeline
-
-This module executes the trained YOLO model across enormous Whole Slide Images (WSIs).
-Given the size of WSIs (often 100K x 100K pixels), direct inference is impossible.
-Instead, we:
-1. Extract sliding tiles (with overlap) using tiffslide.
-2. Quickly discard empty glass using background thresholding.
-3. Run YOLO inference on valid tissue patches.
-4. Apply global Non-Maximum Suppression (NMS) to collapse duplicate detections
-   caused by the overlapping window structure.
-5. Save the resulting tiles and annotations to the active learning DB.
-"""
+"""Sliding-window WSI inference with overlap-aware global NMS."""
 
 from __future__ import annotations
 
-import os
-import sys
 import time
+import uuid
 from pathlib import Path
-from typing import Generator, List, Tuple, Dict, Any
+from typing import Dict, Generator, List, Tuple
 
 import numpy as np
 import torch
 import torchvision
 from PIL import Image
 from loguru import logger
-from sqlalchemy.orm import Session
 from ultralytics import YOLO
 
-# Windows compatibility for WSI reading without C libraries
+from config import RAW_TILES_DIR, ensure_directories, settings
+from database import SessionLocal, init_db
+from models import Annotation, Tile
+
 try:
     import tiffslide
 except ImportError:
-    logger.error("tiffslide not found. Run: pip install tiffslide")
-    sys.exit(1)
+    tiffslide = None
 
-from config import RAW_TILES_DIR, settings, validate_path_within
-from database import SessionLocal, init_db
-from models import Annotation, ClassRegistry, Tile
+
+def _axis_origins(length: int, tile_size: int, stride: int) -> List[int]:
+    """Return origins that include both image boundaries without duplicates."""
+    if length <= tile_size:
+        return [0]
+    last = length - tile_size
+    origins = list(range(0, last + 1, stride))
+    if origins[-1] != last:
+        origins.append(last)
+    return origins
 
 
 class WsiScanner:
-    """Handles extracting overlapping tiles from a Whole Slide Image."""
+    """Extract overlapping tissue tiles while preserving level-0 coordinates."""
 
     def __init__(self, wsi_path: str | Path):
-        self.wsi_path = Path(wsi_path).resolve()
-        if not self.wsi_path.exists():
+        if tiffslide is None:
+            raise RuntimeError(
+                "tiffslide is required for WSI scanning. "
+                "Install project dependencies first."
+            )
+
+        self.wsi_path = Path(wsi_path).expanduser().resolve()
+        if not self.wsi_path.exists() or not self.wsi_path.is_file():
             raise FileNotFoundError(f"WSI not found: {self.wsi_path}")
 
         self.slide = tiffslide.TiffSlide(self.wsi_path)
-        
-        # Determine scanning dimensions
         self.level = settings.magnification_level
-        self.width, self.height = self.slide.level_dimensions[self.level]
-        logger.info(f"Loaded WSI '{self.wsi_path.name}' — {self.width}x{self.height} at level {self.level}")
+        if self.level >= len(self.slide.level_dimensions):
+            self.slide.close()
+            raise ValueError(
+                f"Requested pyramid level {self.level}, but slide has "
+                f"{len(self.slide.level_dimensions)} level(s)."
+            )
 
+        self.width, self.height = self.slide.level_dimensions[self.level]
+        self.downsample = float(self.slide.level_downsamples[self.level])
         self.tile_size = settings.tile_size
-        self.stride = int(self.tile_size * (1.0 - settings.inference_overlap_pct))
+        self.stride = max(
+            1,
+            int(round(self.tile_size * (1.0 - settings.inference_overlap_pct))),
+        )
+        self.x_origins = _axis_origins(self.width, self.tile_size, self.stride)
+        self.y_origins = _axis_origins(self.height, self.tile_size, self.stride)
+        logger.info(
+            "Loaded WSI '{}' — {}x{} at level {} (downsample {:.3f})",
+            self.wsi_path.name,
+            self.width,
+            self.height,
+            self.level,
+            self.downsample,
+        )
+
+    def close(self) -> None:
+        self.slide.close()
 
     def _is_empty_tissue(self, img: Image.Image) -> bool:
-        """
-        Fast filter: Convert to grayscale and check ratio of bright (background) pixels.
-        Avoids sending empty glass glass to the GPU.
-        """
-        # Convert to numpy array in grayscale
-        gray = np.array(img.convert("L"))
-        
-        # Pixels > 220 are typically white/empty glare
-        num_background_pixels = np.sum(gray > 220)
-        total_pixels = self.tile_size * self.tile_size
-        background_pct = float(num_background_pixels) / total_pixels
-        
-        # If the background exceeds threshold, consider it empty glass
+        gray = np.asarray(img.convert("L"))
+        background_pct = float(np.mean(gray > 220))
         return background_pct > settings.background_threshold
 
-    def extract_patches(self) -> Generator[Tuple[int, int, Image.Image, float], None, None]:
-        """
-        Yields (x_coord, y_coord, image, tissue_pct) for patches containing tissue.
-        """
-        total_tiles = sum(
-            1 for _ in range(0, self.width - self.tile_size, self.stride)
-            for _ in range(0, self.height - self.tile_size, self.stride)
-        )
-        logger.info(f"Scanning up to {total_tiles} sliding windows...")
-
+    def extract_patches(
+        self,
+    ) -> Generator[Tuple[int, int, Image.Image, float], None, None]:
+        total_tiles = len(self.x_origins) * len(self.y_origins)
+        logger.info("Scanning up to {} sliding windows...", total_tiles)
         extracted_count = 0
 
-        for y in range(0, self.height - self.tile_size, self.stride):
-            for x in range(0, self.width - self.tile_size, self.stride):
-                # Read specific tile region directly from disk
-                # get_thumbnail is fast, but read_region is precise coordinate extraction
+        for y_level in self.y_origins:
+            for x_level in self.x_origins:
+                x0 = int(round(x_level * self.downsample))
+                y0 = int(round(y_level * self.downsample))
                 img = self.slide.read_region(
-                    (x, y), self.level, (self.tile_size, self.tile_size)
+                    (x0, y0),
+                    self.level,
+                    (self.tile_size, self.tile_size),
                 ).convert("RGB")
-                
-                # Fast background check
                 if self._is_empty_tissue(img):
                     continue
-                
-                # Approximate tissue pct
-                tissue_pct = round(1.0 - (np.sum(np.array(img.convert("L")) > 220) / (self.tile_size**2)), 4)
-                
-                yield (x, y, img, tissue_pct)
+
+                gray = np.asarray(img.convert("L"))
+                tissue_pct = round(1.0 - float(np.mean(gray > 220)), 4)
+                yield x0, y0, img, tissue_pct
                 extracted_count += 1
-                
                 if extracted_count >= settings.max_tiles_to_save_per_wsi:
-                    logger.warning(f"Reached tile limit ({settings.max_tiles_to_save_per_wsi}). Halting scan.")
+                    logger.warning(
+                        "Reached tile limit ({}). Halting scan.",
+                        settings.max_tiles_to_save_per_wsi,
+                    )
                     return
 
 
 class InferencePipeline:
-    """Orchestrates WSI scanning, YOLO inference, NMS, and DB storage."""
+    """Run tiled YOLO inference and write the review queue to SQLite."""
 
     def __init__(self):
+        ensure_directories()
         if not settings.active_model_path.exists():
-            raise FileNotFoundError(f"Active model missing at {settings.active_model_path}")
-            
-        logger.info("Initializing YOLO model & DB Connection...")
+            raise FileNotFoundError(
+                f"Active model missing at {settings.active_model_path}"
+            )
         self.model = YOLO(str(settings.active_model_path))
         self.db = SessionLocal()
-        
-        # Caches the YOLO model's class names (0: "Benign", 1: "Early", etc.)
         self.class_names = self.model.names
+        self.run_id = uuid.uuid4().hex[:10]
 
     def run(self, wsi_path: str | Path) -> None:
-        """Execute the full end-to-end sliding window pipeline."""
         wsi = WsiScanner(wsi_path)
         wsi_name = Path(wsi_path).name
-
-        all_global_detections = []
-        valid_tiles_info = []
-
-        logger.info("Starting inference loop...")
+        all_global_detections: List[Dict] = []
+        valid_tiles_info: List[Dict] = []
         start_time = time.time()
 
-        # Phase 1: Scan and Inflate Local Bounding Boxes
-        for x, y, img, tissue_pct in wsi.extract_patches():
-            # Run YOLO prediction on the single tile
-            results = self.model.predict(
-                img,
-                conf=settings.inference_conf_threshold,
-                verbose=False
-            )
-            
-            result = results[0]
-            boxes = result.boxes
-            
-            # Save empty tiles ONLY if allowed by settings
-            if len(boxes) == 0 and not settings.save_empty_tiles:
-                continue
+        try:
+            for x0, y0, img, tissue_pct in wsi.extract_patches():
+                result = self.model.predict(
+                    img,
+                    conf=settings.inference_conf_threshold,
+                    verbose=False,
+                )[0]
+                boxes = result.boxes
+                if len(boxes) == 0 and not settings.save_empty_tiles:
+                    continue
 
-            # Generate unique filename
-            img_filename = f"{wsi_name}_{x}_{y}.jpg"
-            img_save_path = RAW_TILES_DIR / img_filename
-            
-            # Record tile memory footprint 
-            # (We save immediately to avoid keeping 5000 images in RAM)
-            img.save(img_save_path, "JPEG", quality=90)
-            
-            valid_tiles_info.append({
-                "x": x,
-                "y": y,
-                "tissue": tissue_pct,
-                "filename": img_filename
-            })
-            
-            if len(boxes) == 0:
-                continue
+                img_filename = (
+                    f"{Path(wsi_name).stem}_{self.run_id}_{x0}_{y0}.jpg"
+                )
+                img_save_path = RAW_TILES_DIR / img_filename
+                img.save(img_save_path, "JPEG", quality=90)
+                valid_tiles_info.append(
+                    {
+                        "x": x0,
+                        "y": y0,
+                        "tissue": tissue_pct,
+                        "filename": img_filename,
+                        "downsample": wsi.downsample,
+                    }
+                )
 
-            # Translate YOLO local coordinates (0-1) to Global WSI Pixels
-            # YOLO returns xywhn -> x_center_norm, y_center_norm, w_norm, h_norm
-            for box in boxes:
-                coords = box.xywhn[0].cpu().numpy()
-                conf = float(box.conf[0].cpu())
-                cls_id = int(box.cls[0].cpu())
+                for box in boxes:
+                    x_c_n, y_c_n, w_n, h_n = box.xywhn[0].cpu().numpy()
+                    scale = settings.tile_size * wsi.downsample
+                    gx1 = x0 + (float(x_c_n) - float(w_n) / 2.0) * scale
+                    gy1 = y0 + (float(y_c_n) - float(h_n) / 2.0) * scale
+                    gx2 = x0 + (float(x_c_n) + float(w_n) / 2.0) * scale
+                    gy2 = y0 + (float(y_c_n) + float(h_n) / 2.0) * scale
+                    all_global_detections.append(
+                        {
+                            "box": [gx1, gy1, gx2, gy2],
+                            "score": float(box.conf[0].cpu()),
+                            "class_idx": int(box.cls[0].cpu()),
+                            "tile_filename": img_filename,
+                        }
+                    )
+        finally:
+            wsi.close()
 
-                x_c_n, y_c_n, w_n, h_n = coords
-                
-                # Scale to local pixels
-                lx_c = x_c_n * settings.tile_size
-                ly_c = y_c_n * settings.tile_size
-                lw = w_n * settings.tile_size
-                lh = h_n * settings.tile_size
-                
-                # Transform to bounding box formats [x1, y1, x2, y2] globally
-                gx1 = x + (lx_c - lw / 2)
-                gy1 = y + (ly_c - lh / 2)
-                gx2 = x + (lx_c + lw / 2)
-                gy2 = y + (ly_c + lh / 2)
-                
-                all_global_detections.append({
-                    "box": [gx1, gy1, gx2, gy2],
-                    "score": conf,
-                    "class_idx": cls_id,
-                    "tile_filename": img_filename
-                })
-
-        logger.info(f"Phase 1 complete. Tissues saved: {len(valid_tiles_info)}. Total raw detections: {len(all_global_detections)}")
-
-        if len(all_global_detections) > 0:
-            # Phase 2: Global Non-Maximum Suppression (NMS)
-            final_detections = self._apply_global_nms(all_global_detections)
-        else:
-            final_detections = []
-
-        # Phase 3: Committing to Active Learning Database
-        logger.info("Committing results to the structured database...")
-        self._commit_to_db(wsi_name, valid_tiles_info, final_detections)
-        
-        elapsed = time.time() - start_time
-        logger.success(f"Inference complete in {elapsed:.2f}s!")
+        final_detections = (
+            self._apply_global_nms(all_global_detections)
+            if all_global_detections
+            else []
+        )
+        self._commit_to_db(
+            wsi_name,
+            valid_tiles_info,
+            final_detections,
+        )
+        logger.success(
+            "Inference complete in {:.2f}s",
+            time.time() - start_time,
+        )
 
     def _apply_global_nms(self, detections: List[Dict]) -> List[Dict]:
-        """
-        Resolve boundary overlaps using torchvision's NMS.
-        Returns the subset of detections that survived suppression.
-        """
-        boxes_tensor = torch.tensor([d["box"] for d in detections], dtype=torch.float32)
-        scores_tensor = torch.tensor([d["score"] for d in detections], dtype=torch.float32)
-        
-        # NMS natively supports running per-class or agnostic.
-        # We run it agnostically across all classes here to prevent colliding predictions 
-        # (e.g. if one tile says 'Blast' and the other says 'Lymphocyte' for the same cell)
-        keep_indices = torchvision.ops.nms(
-            boxes_tensor, 
-            scores_tensor, 
-            settings.nms_iou_threshold
+        boxes_tensor = torch.tensor(
+            [d["box"] for d in detections],
+            dtype=torch.float32,
         )
-        
-        survivors = [detections[i] for i in keep_indices]
-        logger.info(f"Global NMS reduced redundant detections from {len(detections)} -> {len(survivors)}")
+        scores_tensor = torch.tensor(
+            [d["score"] for d in detections],
+            dtype=torch.float32,
+        )
+        keep_indices = torchvision.ops.nms(
+            boxes_tensor,
+            scores_tensor,
+            settings.nms_iou_threshold,
+        )
+        survivors = [detections[int(i)] for i in keep_indices]
+        logger.info(
+            "Global NMS reduced detections from {} to {}",
+            len(detections),
+            len(survivors),
+        )
         return survivors
 
+    def _class_name(self, class_idx: int) -> str:
+        if isinstance(self.class_names, dict):
+            return str(self.class_names.get(class_idx, "unknown"))
+        if 0 <= class_idx < len(self.class_names):
+            return str(self.class_names[class_idx])
+        return "unknown"
+
     def _commit_to_db(
-        self, 
-        wsi_name: str, 
-        tiles_info: List[Dict], 
-        survivor_detections: List[Dict]
+        self,
+        wsi_name: str,
+        tiles_info: List[Dict],
+        survivor_detections: List[Dict],
     ) -> None:
-        """
-        Maps surviving global detections back into YOLO-normalized bounds
-        against their designated parent Tile, and commits exactly to the database.
-        """
         try:
-            # Insert Tiles
-            tile_records = {} # Dict[filename, TileORM]
+            tile_records: Dict[str, Tile] = {}
+            tile_info_by_name = {
+                item["filename"]: item
+                for item in tiles_info
+            }
             for info in tiles_info:
+                relative_path = Path("raw_tiles") / info["filename"]
                 tile = Tile(
-                    file_path=info["filename"],
+                    file_path=str(relative_path),
                     source_wsi=wsi_name,
                     x_coord=info["x"],
                     y_coord=info["y"],
                     level=settings.magnification_level,
                     tissue_pct=info["tissue"],
-                    is_annotated=False  # Crucial: marks this as pending pathologist review
+                    is_annotated=False,
                 )
                 self.db.add(tile)
                 tile_records[info["filename"]] = tile
-            
-            # Flush so tiles get primary keys assigned
             self.db.flush()
 
-            # Insert Annotations
             for det in survivor_detections:
-                filename = det["tile_filename"]
-                if filename not in tile_records:
-                    continue
-                    
-                tile = tile_records[filename]
-                
-                # Transform global [x1, y1, x2, y2] back to local [x_center_n, y_center_n, w_n, h_n]
-                gx1, gy1, gx2, gy2 = det["box"]
-                
-                # Local coords inside the tile
-                lx1 = gx1 - tile.x_coord
-                ly1 = gy1 - tile.y_coord
-                lx2 = gx2 - tile.x_coord
-                ly2 = gy2 - tile.y_coord
-                
-                # Enclose bounding box strictly into the [0, 1] tile boundary 
-                # (since cell boundary might slightly break the tile edge)
-                lx1 = max(0.0, min(float(lx1) / settings.tile_size, 1.0))
-                ly1 = max(0.0, min(float(ly1) / settings.tile_size, 1.0))
-                lx2 = max(0.0, min(float(lx2) / settings.tile_size, 1.0))
-                ly2 = max(0.0, min(float(ly2) / settings.tile_size, 1.0))
-                
-                w_n = lx2 - lx1
-                h_n = ly2 - ly1
-                xc_n = lx1 + (w_n / 2.0)
-                yc_n = ly1 + (h_n / 2.0)
-
-                # Skip invalid collapsed boxes
-                if w_n <= 0.001 or h_n <= 0.001:
+                tile = tile_records.get(det["tile_filename"])
+                info = tile_info_by_name.get(det["tile_filename"])
+                if tile is None or info is None:
                     continue
 
-                class_string = self.class_names.get(det["class_idx"], "unknown")
-
-                ann = Annotation(
-                    tile_id=tile.id,
-                    class_label=class_string,
-                    x_center=xc_n,
-                    y_center=yc_n,
-                    width=w_n,
-                    height=h_n,
-                    confidence=det["score"],
-                    is_manual=False  # Flags this as machine-generated
+                tile_span = (
+                    settings.tile_size
+                    * float(info["downsample"])
                 )
-                self.db.add(ann)
-
+                gx1, gy1, gx2, gy2 = det["box"]
+                lx1 = max(
+                    0.0,
+                    min((gx1 - tile.x_coord) / tile_span, 1.0),
+                )
+                ly1 = max(
+                    0.0,
+                    min((gy1 - tile.y_coord) / tile_span, 1.0),
+                )
+                lx2 = max(
+                    0.0,
+                    min((gx2 - tile.x_coord) / tile_span, 1.0),
+                )
+                ly2 = max(
+                    0.0,
+                    min((gy2 - tile.y_coord) / tile_span, 1.0),
+                )
+                width = lx2 - lx1
+                height = ly2 - ly1
+                if width <= 0.001 or height <= 0.001:
+                    continue
+                class_name = self._class_name(det["class_idx"])
+                if class_name == "unknown":
+                    continue
+                self.db.add(
+                    Annotation(
+                        tile_id=tile.id,
+                        class_label=class_name,
+                        x_center=lx1 + width / 2.0,
+                        y_center=ly1 + height / 2.0,
+                        width=width,
+                        height=height,
+                        confidence=det["score"],
+                        is_manual=False,
+                    )
+                )
             self.db.commit()
-            
-        except Exception as e:
+        except Exception:
             self.db.rollback()
-            logger.error(f"Failed to commit inference results to database: {e}")
             raise
         finally:
             self.db.close()
@@ -320,10 +307,15 @@ class InferencePipeline:
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Slide-Window WSI Inference")
-    parser.add_argument("wsi_path", type=str, help="Absolute path to .svs or .tiff file")
+
+    parser = argparse.ArgumentParser(
+        description="Sliding-window WSI inference"
+    )
+    parser.add_argument(
+        "wsi_path",
+        type=str,
+        help="Path to an SVS/TIFF whole-slide image",
+    )
     args = parser.parse_args()
-    
     init_db()
-    pipeline = InferencePipeline()
-    pipeline.run(args.wsi_path)
+    InferencePipeline().run(args.wsi_path)

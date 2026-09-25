@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install core test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            fastapi==0.141.1 \
+            python-multipart==0.0.32 \
+            Pillow==12.3.0 \
+            httpx==0.28.1 \
+            sqlalchemy==2.0.36 \
+            pydantic==2.10.4 \
+            pydantic-settings==2.7.1 \
+            PyYAML==6.0.2 \
+            loguru==0.7.3 \
+            pytest==9.1.1
+      - name: Compile Python sources
+        run: python -m compileall -q .
+      - name: Run tests
+        run: pytest -q tests
+      - name: FastAPI smoke test
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from app import app
+
+          with TestClient(app) as client:
+              assert client.get("/").status_code == 200
+              health = client.get("/api/health")
+              assert health.status_code == 200
+              assert health.json()["status"] == "ok"
+              config = client.get("/api/config")
+              assert config.status_code == 200
+              assert config.json()["taxonomy"]
+          PY
+      - name: JavaScript syntax check
+        run: node --check public/app.js
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Audit pinned dependencies
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit -r requirements.txt

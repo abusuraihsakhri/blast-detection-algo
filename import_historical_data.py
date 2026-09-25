@@ -3,18 +3,17 @@ Ingestion script for registering downloaded YOLO datasets into the
 pathology_active_learning SQLite database.
 
 Scans standard YOLO directory structures (train/, valid/, test/) and
-inserts AnnotationRecord rows so the Experience Replay Buffer can
-perform stratified sampling over historical data.
+inserts AnnotationRecord rows for source-dataset provenance and label
+metadata. Incremental replay uses reviewed Tile/Annotation records instead.
 
 Usage:
     python import_historical_data.py
 
-Security Notes:
-    - All file paths are resolved to absolute, canonical forms to prevent
-      directory-traversal issues when later consumed.
+Notes:
+    - File paths are resolved to canonical absolute paths for provenance.
+    - The caller is responsible for choosing an appropriate dataset root.
     - Duplicate detection uses the unique constraint on image_path.
-    - Label files are read in text mode with explicit encoding to avoid
-      codec-based injection vectors.
+    - Label files are read in text mode with explicit UTF-8 encoding.
 """
 
 from __future__ import annotations
@@ -170,5 +169,5 @@ if __name__ == "__main__":
     ingest_dataset(leukemia_path, "leukemia-nfxzn")
 
     print("\n" + "=" * 60)
-    print("  Database is primed and ready for the Experience Replay Buffer.")
+    print("  Source-dataset provenance table is ready.")
     print("=" * 60)
