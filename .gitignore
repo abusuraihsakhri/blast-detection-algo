@@ -1,23 +1,28 @@
-# Environment secrets
 .env
-
-# Python
+.env.*
+!.env.example
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
-
-# Database
+venv/
 *.db
 *.db-*
-
-# IDE
 .vscode/
 .idea/
-
-# Large Datasets, Models, and Training Logs
 data/
 logs/
 runs/
 *.pt
+*.pth
+*.onnx
+*.svs
+*.tif
 *.tiff
+*.ndpi
 *-1/
+_temp_*/
+.DS_Store
+Thumbs.db
