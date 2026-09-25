@@ -839,7 +839,6 @@ async function handleSandboxFile(file) {
     "image/jpeg",
     "image/png",
     "image/bmp",
-    "image/tiff",
     "image/webp"
   ];
   if (!validTypes.includes(file.type)) {
