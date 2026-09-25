@@ -324,6 +324,11 @@ async def _read_valid_image(file: UploadFile) -> Image.Image:
 @app.post("/api/test/upload")
 async def test_inference(file: UploadFile = File(...)):
     global _inf_model
+
+    # Validate uploaded file first to reject malformed, oversized, or unauthorized payloads
+    image = await _read_valid_image(file)
+    _cleanup_old_sandbox_uploads()
+
     try:
         from ultralytics import YOLO
     except ImportError as exc:
@@ -339,9 +344,6 @@ async def test_inference(file: UploadFile = File(...)):
                 detail="No active model is available. Train or provide a model first.",
             )
         _inf_model = YOLO(str(settings.active_model_path))
-
-    image = await _read_valid_image(file)
-    _cleanup_old_sandbox_uploads()
 
     safe_id = uuid.uuid4().hex[:12]
     orig_stem = Path(file.filename or "upload").stem
