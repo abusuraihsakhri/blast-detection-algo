@@ -1,948 +1,1366 @@
-/**
- * Pathology Active Learning UI
- * Handles Canvas rendering, tool states, backend syncing,
- * and interactive Sandbox Inference mode with correction workflow.
- */
+"use strict";
 
-// --- Color palette for per-class rendering in sandbox ---
 const CLASS_COLORS = [
-    '#34d399', '#60a5fa', '#f472b6', '#fbbf24',
-    '#a78bfa', '#fb923c', '#2dd4bf', '#f87171',
-    '#818cf8', '#4ade80'
+  "#16a34a", "#2563eb", "#db2777", "#d97706", "#7c3aed",
+  "#ea580c", "#0f766e", "#dc2626", "#4f46e5", "#65a30d"
 ];
 
-// --- State ---
+const $ = (id) => document.getElementById(id);
+const els = {
+  imgCanvas: $("image-canvas"), overlayCanvas: $("overlay-canvas"),
+  tileStatus: $("tile-status"), statId: $("stat-id"), statBoxes: $("stat-boxes"),
+  modeAl: $("mode-al"), modeSandbox: $("mode-sandbox"), themeToggle: $("theme-toggle"),
+  alToolbar: $("al-toolbar"), sandboxToolbar: $("sandbox-toolbar"),
+  toolDraw: $("tool-draw"), toolMove: $("tool-move"), btnClear: $("btn-clear"),
+  sandboxToolDraw: $("sandbox-tool-draw"), sandboxToolMove: $("sandbox-tool-move"),
+  btnClearSandbox: $("btn-clear-sandbox"), sandboxFilename: $("sandbox-filename"),
+  alPanels: $("al-sidebar-panels"), sandboxPanels: $("sandbox-sidebar-panels"),
+  controlsEmpty: $("controls-empty"), controlsActive: $("controls-active"), classSelect: $("class-select"),
+  btnDeleteBox: $("btn-delete-box"), sandboxControlsEmpty: $("sandbox-controls-empty"),
+  sandboxControlsActive: $("sandbox-controls-active"), sandboxClassSelect: $("sandbox-class-select"),
+  btnDeleteSandboxBox: $("btn-delete-sandbox-box"), alActions: $("al-actions"),
+  sandboxActions: $("sandbox-actions"), btnSave: $("btn-save"), btnSaveCorrections: $("btn-save-corrections"),
+  btnUpload: $("btn-upload"), fileUpload: $("file-upload"), dropzone: $("dropzone"),
+  inferenceSpinner: $("inference-spinner"), confSlider: $("conf-slider"), confValue: $("conf-value"),
+  sandboxResultsEmpty: $("sandbox-results-empty"), sandboxResultsList: $("sandbox-results-list"),
+  sandboxDetCount: $("sandbox-det-count"), sandboxVisCount: $("sandbox-vis-count"),
+  sandboxBreakdown: $("sandbox-breakdown")
+};
+
+const ctxImg = els.imgCanvas.getContext("2d");
+const ctxOverlay = els.overlayCanvas.getContext("2d");
+
 let taxonomy = [];
-let currentTile = null; // { id, path }
-let boxes = []; // { id, class_label, x_c, y_c, w, h, selected, confidence? }
-let boxIdCounter = 0;
-
-let currentMode = 'draw'; // 'draw' | 'move'
-let selectedBoxId = null;
-let appMode = 'al'; // 'al' | 'sandbox'
-
-// Drawing state
-let isDrawing = false;
-let drawStartX = 0;
-let drawStartY = 0;
-let drawCurrentX = 0;
-let drawCurrentY = 0;
-
-// Dragging state
-let isDragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
-
-// Sandbox state
-let sandboxPredictions = []; // raw predictions from API
-let confThreshold = 0.25;
+let appMode = "al";
+let alToolMode = "draw";
+let sandboxToolMode = "draw";
+let currentTile = null;
+let alBoxes = [];
+let sandboxBoxes = [];
+let selectedAlId = null;
+let selectedSandboxId = null;
+let nextBoxId = 1;
+let predictionCount = 0;
+let confidenceThreshold = 0.25;
+let sandboxFilenameOnServer = null;
 let sandboxImageLoaded = false;
-let sandboxFilenameOnServer = null; // filename returned by backend after upload
-let sandboxCorrected = false; // tracks if user made any correction
+let maxUploadMb = 25;
 
-// --- Elements ---
-const canvasContainer = document.getElementById('canvas-container');
-const imgCanvas = document.getElementById('image-canvas');
-const overlayCanvas = document.getElementById('overlay-canvas');
-const ctxImg = imgCanvas.getContext('2d');
-const ctxOverlay = overlayCanvas.getContext('2d');
+const alImage = new Image();
+const sandboxImage = new Image();
+let alImageReady = false;
+let sandboxImageReady = false;
 
-// AL tools
-const btnDraw = document.getElementById('tool-draw');
-const btnMove = document.getElementById('tool-move');
-const btnClear = document.getElementById('btn-clear');
-const btnSave = document.getElementById('btn-save');
-const btnDeleteBox = document.getElementById('btn-delete-box');
+let isDrawing = false;
+let isDragging = false;
+let pointerId = null;
+let drawStart = { x: 0, y: 0 };
+let drawCurrent = { x: 0, y: 0 };
+let dragPrevious = { x: 0, y: 0 };
 
-const controlsEmpty = document.getElementById('controls-empty');
-const controlsActive = document.getElementById('controls-active');
-const classSelect = document.getElementById('class-select');
+function setStatus(message, tone = "neutral") {
+  els.tileStatus.textContent = message;
+  const colors = {
+    neutral: "var(--muted)",
+    primary: "var(--primary)",
+    success: "var(--success)",
+    danger: "var(--danger)",
+    warning: "var(--warning)"
+  };
+  els.tileStatus.style.color = colors[tone] || colors.neutral;
+}
 
-const statId = document.getElementById('stat-id');
-const statBoxes = document.getElementById('stat-boxes');
-const tileStatus = document.getElementById('tile-status');
+async function fetchJSON(url, options) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      data.detail || data.message || `Request failed (${response.status})`
+    );
+  }
+  return data;
+}
 
-// Mode switcher
-const modeAlBtn = document.getElementById('mode-al');
-const modeSandboxBtn = document.getElementById('mode-sandbox');
+function populateSelect(select) {
+  select.replaceChildren();
+  taxonomy.forEach((name) => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    select.appendChild(option);
+  });
+}
 
-// Toolbars
-const alToolbar = document.getElementById('al-toolbar');
-const sandboxToolbar = document.getElementById('sandbox-toolbar');
-const sandboxFilenameEl = document.getElementById('sandbox-filename');
-const btnClearSandbox = document.getElementById('btn-clear-sandbox');
+function currentImage() {
+  return appMode === "al"
+    ? (alImageReady ? alImage : null)
+    : (sandboxImageReady ? sandboxImage : null);
+}
 
-// Sandbox tools
-const sandboxToolDraw = document.getElementById('sandbox-tool-draw');
-const sandboxToolMove = document.getElementById('sandbox-tool-move');
+function currentBoxes() {
+  return appMode === "al" ? alBoxes : sandboxBoxes;
+}
 
-// Sidebar panels
-const alSidebarPanels = document.getElementById('al-sidebar-panels');
-const sandboxSidebarPanels = document.getElementById('sandbox-sidebar-panels');
+function visibleBoxes() {
+  if (appMode === "al") return alBoxes;
+  return visibleSandboxBoxes();
+}
 
-// Sandbox box editor
-const sandboxControlsEmpty = document.getElementById('sandbox-controls-empty');
-const sandboxControlsActive = document.getElementById('sandbox-controls-active');
-const sandboxClassSelect = document.getElementById('sandbox-class-select');
-const btnDeleteSandboxBox = document.getElementById('btn-delete-sandbox-box');
+function currentSelectedId() {
+  return appMode === "al" ? selectedAlId : selectedSandboxId;
+}
 
-// Actions
-const alActions = document.getElementById('al-actions');
-const sandboxActions = document.getElementById('sandbox-actions');
-const fileUpload = document.getElementById('file-upload');
-const btnUpload = document.getElementById('btn-upload');
-const btnSaveCorrections = document.getElementById('btn-save-corrections');
+function setSelectedId(id) {
+  if (appMode === "al") selectedAlId = id;
+  else selectedSandboxId = id;
+  currentBoxes().forEach((box) => {
+    box.selected = box.id === id;
+  });
+  updatePanels();
+  redrawOverlay();
+}
 
-// Sandbox results
-const sandboxResultsEmpty = document.getElementById('sandbox-results-empty');
-const sandboxResultsList = document.getElementById('sandbox-results-list');
-const sandboxDetCount = document.getElementById('sandbox-det-count');
-const sandboxVisCount = document.getElementById('sandbox-vis-count');
-const sandboxBreakdown = document.getElementById('sandbox-breakdown');
+function setCanvasForImage(image) {
+  if (!image) {
+    ctxImg.clearRect(
+      0,
+      0,
+      els.imgCanvas.width,
+      els.imgCanvas.height
+    );
+    ctxOverlay.clearRect(
+      0,
+      0,
+      els.overlayCanvas.width,
+      els.overlayCanvas.height
+    );
+    return;
+  }
+  els.imgCanvas.width = image.naturalWidth || image.width;
+  els.imgCanvas.height = image.naturalHeight || image.height;
+  els.overlayCanvas.width = els.imgCanvas.width;
+  els.overlayCanvas.height = els.imgCanvas.height;
+  ctxImg.clearRect(
+    0,
+    0,
+    els.imgCanvas.width,
+    els.imgCanvas.height
+  );
+  ctxImg.drawImage(image, 0, 0);
+  redrawOverlay();
+}
 
-// Confidence slider
-const confSlider = document.getElementById('conf-slider');
-const confValue = document.getElementById('conf-value');
+function renderCurrentImage() {
+  setCanvasForImage(currentImage());
+}
 
-// Dropzone
-const dropzone = document.getElementById('dropzone');
-
-// Spinner
-const inferenceSpinner = document.getElementById('inference-spinner');
-
-// An Image object to hold the current raw_tile
-let currentImg = new Image();
-
-// --- Initialization ---
-async function init() {
-    await fetchConfig();
-    setupEventListeners();
-    setupSandboxListeners();
-    await fetchNextTile();
+function loadImage(image, src) {
+  return new Promise((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(
+      new Error("Image could not be loaded.")
+    );
+    image.src = src;
+  });
 }
 
 async function fetchConfig() {
-    try {
-        const res = await fetch('/api/config');
-        const data = await res.json();
-        taxonomy = data.taxonomy;
-        
-        // Populate AL select box
-        classSelect.innerHTML = '';
-        taxonomy.forEach(cls => {
-            const opt = document.createElement('option');
-            opt.value = cls;
-            opt.textContent = cls;
-            classSelect.appendChild(opt);
-        });
-        
-        // Populate Sandbox select box
-        sandboxClassSelect.innerHTML = '';
-        taxonomy.forEach(cls => {
-            const opt = document.createElement('option');
-            opt.value = cls;
-            opt.textContent = cls;
-            sandboxClassSelect.appendChild(opt);
-        });
-    } catch (e) {
-        console.error("Failed to load taxonomy", e);
-    }
+  const data = await fetchJSON("/api/config");
+  taxonomy = Array.isArray(data.taxonomy)
+    ? data.taxonomy
+    : [];
+  maxUploadMb = Number(
+    data.max_upload_mb || 25
+  );
+  populateSelect(els.classSelect);
+  populateSelect(els.sandboxClassSelect);
 }
 
 async function fetchNextTile() {
-    tileStatus.textContent = "Fetching next tile...";
-    tileStatus.style.color = "var(--accent-primary)";
-    btnSave.disabled = true;
-    boxes = [];
-    selectedBoxId = null;
-    updateSidebar();
+  setStatus(
+    "Fetching next tile…",
+    "primary"
+  );
+  els.btnSave.disabled = true;
+  alBoxes = [];
+  selectedAlId = null;
+  updatePanels();
 
-    try {
-        const res = await fetch('/api/tile/next');
-        const data = await res.json();
-        
-        if (data.status === 'empty') {
-            tileStatus.textContent = "Queue Empty. All caught up!";
-            tileStatus.style.color = "var(--box-color-default)";
-            ctxImg.clearRect(0, 0, imgCanvas.width, imgCanvas.height);
-            ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-            currentTile = null;
-            return;
-        }
-
-        currentTile = data.tile;
-        statId.textContent = currentTile.id;
-        tileStatus.textContent = `Reviewing Tile #${currentTile.id}`;
-        tileStatus.style.color = "var(--text-main)";
-
-        // Load image into canvas
-        currentImg.onload = () => {
-            imgCanvas.width = currentImg.width;
-            imgCanvas.height = currentImg.height;
-            overlayCanvas.width = currentImg.width;
-            overlayCanvas.height = currentImg.height;
-
-            ctxImg.drawImage(currentImg, 0, 0);
-
-            data.annotations.forEach(a => {
-                boxes.push({
-                    id: boxIdCounter++,
-                    class_label: a.class_label,
-                    x_c: a.x_center,
-                    y_c: a.y_center,
-                    w: a.width,
-                    h: a.height,
-                    selected: false
-                });
-            });
-
-            btnSave.disabled = false;
-            redrawOverlay();
-        };
-
-        currentImg.src = data.tile.path;
-
-    } catch (e) {
-        console.error(e);
-        tileStatus.textContent = "Error loading tile.";
-        tileStatus.style.color = "var(--accent-danger)";
+  try {
+    const data = await fetchJSON(
+      "/api/tile/next"
+    );
+    if (data.status === "empty") {
+      currentTile = null;
+      alImageReady = false;
+      els.statId.textContent = "—";
+      setStatus(
+        "Review queue empty",
+        "success"
+      );
+      if (appMode === "al") {
+        renderCurrentImage();
+      }
+      return;
     }
+
+    currentTile = data.tile;
+    els.statId.textContent = String(
+      currentTile.id
+    );
+    alBoxes = (data.annotations || []).map(
+      (ann) => ({
+        id: nextBoxId++,
+        class_label: ann.class_label,
+        x_c: ann.x_center,
+        y_c: ann.y_center,
+        w: ann.width,
+        h: ann.height,
+        confidence: ann.score,
+        selected: false,
+        source: "model"
+      })
+    );
+
+    await loadImage(
+      alImage,
+      currentTile.path
+    );
+    alImageReady = true;
+    setStatus(
+      `Reviewing tile #${currentTile.id}`
+    );
+    els.btnSave.disabled = false;
+    updatePanels();
+    if (appMode === "al") {
+      renderCurrentImage();
+    }
+  } catch (error) {
+    currentTile = null;
+    alImageReady = false;
+    setStatus(
+      error.message,
+      "danger"
+    );
+    showToast(error.message);
+  }
 }
 
-// --- Mode Switching ---
-function switchAppMode(mode) {
-    appMode = mode;
-    
-    modeAlBtn.classList.toggle('active', mode === 'al');
-    modeSandboxBtn.classList.toggle('active', mode === 'sandbox');
-    
-    if (mode === 'al') {
-        alToolbar.classList.remove('hidden');
-        sandboxToolbar.classList.add('hidden');
-        alSidebarPanels.classList.remove('hidden');
-        sandboxSidebarPanels.classList.add('hidden');
-        alActions.classList.remove('hidden');
-        sandboxActions.classList.add('hidden');
-        dropzone.classList.add('hidden');
-        
-        tileStatus.textContent = currentTile 
-            ? `Reviewing Tile #${currentTile.id}` 
-            : 'Queue Empty. All caught up!';
-        tileStatus.style.color = 'var(--text-main)';
-        
-        overlayCanvas.style.cursor = 'crosshair';
-        
-    } else {
-        alToolbar.classList.add('hidden');
-        sandboxToolbar.classList.remove('hidden');
-        alSidebarPanels.classList.add('hidden');
-        sandboxSidebarPanels.classList.remove('hidden');
-        alActions.classList.add('hidden');
-        sandboxActions.classList.remove('hidden');
-        
-        tileStatus.textContent = 'Sandbox — Predict & Correct';
-        tileStatus.style.color = 'var(--accent-amber)';
-        
-        overlayCanvas.style.cursor = 'crosshair';
-        
-        if (!sandboxImageLoaded) {
-            dropzone.classList.remove('hidden');
-            ctxImg.clearRect(0, 0, imgCanvas.width, imgCanvas.height);
-            ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        } else {
-            dropzone.classList.add('hidden');
-        }
-    }
+function switchMode(mode) {
+  appMode = mode;
+  const isAl = mode === "al";
+
+  els.modeAl.classList.toggle(
+    "active",
+    isAl
+  );
+  els.modeSandbox.classList.toggle(
+    "active",
+    !isAl
+  );
+  els.modeAl.setAttribute(
+    "aria-pressed",
+    String(isAl)
+  );
+  els.modeSandbox.setAttribute(
+    "aria-pressed",
+    String(!isAl)
+  );
+  els.alToolbar.classList.toggle(
+    "hidden",
+    !isAl
+  );
+  els.sandboxToolbar.classList.toggle(
+    "hidden",
+    isAl
+  );
+  els.alPanels.classList.toggle(
+    "hidden",
+    !isAl
+  );
+  els.sandboxPanels.classList.toggle(
+    "hidden",
+    isAl
+  );
+  els.alActions.classList.toggle(
+    "hidden",
+    !isAl
+  );
+  els.sandboxActions.classList.toggle(
+    "hidden",
+    isAl
+  );
+  els.dropzone.classList.toggle(
+    "hidden",
+    isAl || sandboxImageLoaded
+  );
+
+  setStatus(
+    isAl
+      ? (
+        currentTile
+          ? `Reviewing tile #${currentTile.id}`
+          : "Review queue empty"
+      )
+      : "Sandbox — upload or review an image",
+    isAl ? "neutral" : "warning"
+  );
+  updateToolButtons();
+  updatePanels();
+  renderCurrentImage();
 }
 
-// --- Tools & Events ---
-function setSandboxMode(mode) {
-    currentMode = mode;
-    sandboxToolDraw.classList.toggle('active', mode === 'draw');
-    sandboxToolMove.classList.toggle('active', mode === 'move');
-    if (mode === 'draw') {
-        sandboxSelectBox(null);
-    }
+function updateToolButtons() {
+  els.toolDraw.classList.toggle(
+    "active",
+    alToolMode === "draw"
+  );
+  els.toolMove.classList.toggle(
+    "active",
+    alToolMode === "move"
+  );
+  els.sandboxToolDraw.classList.toggle(
+    "active",
+    sandboxToolMode === "draw"
+  );
+  els.sandboxToolMove.classList.toggle(
+    "active",
+    sandboxToolMode === "move"
+  );
+  els.overlayCanvas.style.cursor = (
+    appMode === "al"
+      ? alToolMode
+      : sandboxToolMode
+  ) === "draw"
+    ? "crosshair"
+    : "default";
 }
 
-function setMode(mode) {
-    currentMode = mode;
-    btnDraw.classList.toggle('active', mode === 'draw');
-    btnMove.classList.toggle('active', mode === 'move');
-    if (mode === 'draw') {
-        selectBox(null);
+function setTool(mode) {
+  if (appMode === "al") {
+    alToolMode = mode;
+    if (mode === "draw") {
+      selectedAlId = null;
     }
+  } else {
+    sandboxToolMode = mode;
+    if (mode === "draw") {
+      selectedSandboxId = null;
+    }
+  }
+
+  currentBoxes().forEach((box) => {
+    box.selected =
+      box.id === currentSelectedId();
+  });
+  updateToolButtons();
+  updatePanels();
+  redrawOverlay();
 }
 
-function setupEventListeners() {
-    btnDraw.addEventListener('click', () => setMode('draw'));
-    btnMove.addEventListener('click', () => setMode('move'));
-    
-    btnClear.addEventListener('click', () => {
-        boxes = [];
-        selectBox(null);
-        redrawOverlay();
+function visibleSandboxBoxes() {
+  return sandboxBoxes.filter(
+    (box) => (
+      box.source !== "prediction"
+      || box.confidence >= confidenceThreshold
+    )
+  );
+}
+
+function updatePanels() {
+  els.statBoxes.textContent = String(
+    alBoxes.length
+  );
+  const alSelected = alBoxes.find(
+    (box) => box.id === selectedAlId
+  );
+  els.controlsEmpty.classList.toggle(
+    "hidden",
+    Boolean(alSelected)
+  );
+  els.controlsActive.classList.toggle(
+    "hidden",
+    !alSelected
+  );
+  if (alSelected) {
+    els.classSelect.value =
+      alSelected.class_label;
+  }
+
+  const sandboxVisible =
+    visibleSandboxBoxes();
+  if (
+    selectedSandboxId !== null
+    && !sandboxVisible.some(
+      (box) => box.id === selectedSandboxId
+    )
+  ) {
+    selectedSandboxId = null;
+    sandboxBoxes.forEach((box) => {
+      box.selected = false;
     });
+  }
 
-    btnDeleteBox.addEventListener('click', () => {
-        if (selectedBoxId !== null) {
-            boxes = boxes.filter(b => b.id !== selectedBoxId);
-            selectBox(null);
-            redrawOverlay();
-        }
-    });
-
-    classSelect.addEventListener('change', (e) => {
-        if (selectedBoxId !== null) {
-            const b = boxes.find(bx => bx.id === selectedBoxId);
-            if (b) b.class_label = e.target.value;
-            redrawOverlay();
-        }
-    });
-
-    btnSave.addEventListener('click', saveAndNext);
-
-    // Mouse events on overlay
-    overlayCanvas.addEventListener('mousedown', onMouseDown);
-    overlayCanvas.addEventListener('mousemove', onMouseMove);
-    overlayCanvas.addEventListener('mouseup', onMouseUp);
-    overlayCanvas.addEventListener('mouseleave', onMouseUp);
-    
-    // Mode switcher
-    modeAlBtn.addEventListener('click', () => switchAppMode('al'));
-    modeSandboxBtn.addEventListener('click', () => switchAppMode('sandbox'));
+  const sbSelected = sandboxBoxes.find(
+    (box) => box.id === selectedSandboxId
+  );
+  els.sandboxControlsEmpty.classList.toggle(
+    "hidden",
+    Boolean(sbSelected)
+  );
+  els.sandboxControlsActive.classList.toggle(
+    "hidden",
+    !sbSelected
+  );
+  if (sbSelected) {
+    els.sandboxClassSelect.value =
+      sbSelected.class_label;
+  }
+  updateSandboxStats();
 }
 
-function setupSandboxListeners() {
-    // Upload button triggers hidden file input
-    btnUpload.addEventListener('click', () => fileUpload.click());
-    fileUpload.addEventListener('change', (e) => {
-        if (e.target.files && e.target.files[0]) {
-            handleSandboxFile(e.target.files[0]);
-            fileUpload.value = ''; // reset so same file can be re-uploaded
-        }
-    });
-    
-    // Drag and drop on dropzone
-    dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('drag-over');
-    });
-    dropzone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('drag-over');
-    });
-    dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('drag-over');
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            handleSandboxFile(e.dataTransfer.files[0]);
-        }
-    });
-    
-    // Sandbox tools
-    sandboxToolDraw.addEventListener('click', () => setSandboxMode('draw'));
-    sandboxToolMove.addEventListener('click', () => setSandboxMode('move'));
-    
-    // Clear sandbox
-    btnClearSandbox.addEventListener('click', resetSandbox);
-    
-    // Sandbox class select
-    sandboxClassSelect.addEventListener('change', (e) => {
-        if (selectedBoxId !== null) {
-            const b = boxes.find(bx => bx.id === selectedBoxId);
-            if (b) {
-                b.class_label = e.target.value;
-                sandboxCorrected = true;
-                btnSaveCorrections.disabled = false;
-            }
-            redrawOverlay();
-            updateSandboxBreakdown();
-        }
-    });
-    
-    // Delete sandbox box
-    btnDeleteSandboxBox.addEventListener('click', () => {
-        if (selectedBoxId !== null) {
-            boxes = boxes.filter(b => b.id !== selectedBoxId);
-            sandboxSelectBox(null);
-            sandboxCorrected = true;
-            btnSaveCorrections.disabled = false;
-            redrawOverlay();
-            updateSandboxBreakdown();
-        }
-    });
-    
-    // Confidence slider
-    confSlider.addEventListener('input', (e) => {
-        confThreshold = parseInt(e.target.value) / 100;
-        confValue.textContent = confThreshold.toFixed(2);
-        filterAndRenderSandbox();
-    });
-    
-    // Save corrections
-    btnSaveCorrections.addEventListener('click', saveCorrections);
-}
+function updateSandboxStats() {
+  const visible = visibleSandboxBoxes();
+  els.sandboxDetCount.textContent = String(
+    predictionCount
+  );
+  els.sandboxVisCount.textContent = String(
+    visible.length
+  );
 
-function resetSandbox() {
-    sandboxImageLoaded = false;
-    sandboxPredictions = [];
-    sandboxFilenameOnServer = null;
-    sandboxCorrected = false;
-    boxes = [];
-    selectedBoxId = null;
-    sandboxFilenameEl.textContent = 'No image loaded';
-    sandboxResultsEmpty.classList.remove('hidden');
-    sandboxResultsList.classList.add('hidden');
-    sandboxBreakdown.innerHTML = '';
-    sandboxSelectBox(null);
-    btnSaveCorrections.disabled = true;
-    ctxImg.clearRect(0, 0, imgCanvas.width, imgCanvas.height);
-    ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-    dropzone.classList.remove('hidden');
-}
+  const hasResults = sandboxImageLoaded;
+  els.sandboxResultsEmpty.classList.toggle(
+    "hidden",
+    hasResults
+  );
+  els.sandboxResultsList.classList.toggle(
+    "hidden",
+    !hasResults
+  );
+  els.sandboxBreakdown.replaceChildren();
 
-// --- Sandbox Box Selection ---
-function sandboxSelectBox(id) {
-    selectedBoxId = id;
-    boxes.forEach(b => b.selected = (b.id === id));
-    
-    if (id !== null) {
-        sandboxControlsEmpty.classList.add('hidden');
-        sandboxControlsActive.classList.remove('hidden');
-        const b = boxes.find(bx => bx.id === id);
-        if (b) sandboxClassSelect.value = b.class_label;
-    } else {
-        sandboxControlsEmpty.classList.remove('hidden');
-        sandboxControlsActive.classList.add('hidden');
+  const counts = new Map();
+  visible.forEach((box) => {
+    counts.set(
+      box.class_label,
+      (counts.get(box.class_label) || 0) + 1
+    );
+  });
+
+  [...counts.entries()].forEach(
+    ([className, count], index) => {
+      const row =
+        document.createElement("div");
+      row.className = "det-class-row";
+
+      const swatch =
+        document.createElement("span");
+      swatch.className =
+        "det-class-swatch";
+      swatch.style.backgroundColor =
+        CLASS_COLORS[
+          index % CLASS_COLORS.length
+        ];
+
+      const name =
+        document.createElement("span");
+      name.className = "det-class-name";
+      name.textContent = className;
+
+      const number =
+        document.createElement("span");
+      number.className =
+        "det-class-count";
+      number.textContent = String(count);
+
+      row.append(
+        swatch,
+        name,
+        number
+      );
+      els.sandboxBreakdown.appendChild(
+        row
+      );
     }
-    
-    redrawOverlay();
+  );
 }
 
-// --- Sandbox Logic ---
-async function handleSandboxFile(file) {
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/bmp', 'image/tiff', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-        alert('Invalid file type. Please upload JPG, PNG, BMP, TIFF, or WebP.');
-        return;
-    }
-    
-    // Reset state for new image
-    sandboxCorrected = false;
-    sandboxPredictions = [];
-    boxes = [];
-    selectedBoxId = null;
-    sandboxSelectBox(null);
-    btnSaveCorrections.disabled = true;
-    
-    // Show spinner, hide dropzone
-    dropzone.classList.add('hidden');
-    inferenceSpinner.classList.remove('hidden');
-    sandboxFilenameEl.textContent = file.name;
-    tileStatus.textContent = 'Running inference...';
-    tileStatus.style.color = 'var(--accent-primary)';
-    
-    // Load image into canvas for preview while waiting
-    const localUrl = URL.createObjectURL(file);
-    const previewImg = new Image();
-    
-    previewImg.onload = () => {
-        imgCanvas.width = previewImg.width;
-        imgCanvas.height = previewImg.height;
-        overlayCanvas.width = previewImg.width;
-        overlayCanvas.height = previewImg.height;
-        ctxImg.drawImage(previewImg, 0, 0);
-        ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        URL.revokeObjectURL(localUrl);
-    };
-    previewImg.src = localUrl;
-    
-    // Upload to backend
-    try {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const res = await fetch('/api/test/upload', {
-            method: 'POST',
-            body: formData
-        });
-        
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.detail || `Server error ${res.status}`);
-        }
-        
-        const data = await res.json();
-        sandboxPredictions = data.predictions || [];
-        sandboxFilenameOnServer = data.sandbox_filename;
-        sandboxImageLoaded = true;
-        
-        tileStatus.textContent = `Sandbox — ${sandboxPredictions.length} detection(s) — Edit & Save`;
-        tileStatus.style.color = 'var(--accent-success)';
-        
-        // Enable save button immediately (user can accept model predictions as-is)
-        btnSaveCorrections.disabled = false;
-        
-        filterAndRenderSandbox();
-        
-    } catch (err) {
-        console.error('Inference error:', err);
-        tileStatus.textContent = `Error: ${err.message}`;
-        tileStatus.style.color = 'var(--accent-danger)';
-        dropzone.classList.remove('hidden');
-    } finally {
-        inferenceSpinner.classList.add('hidden');
-    }
-}
-
-function filterAndRenderSandbox() {
-    // Filter predictions by confidence threshold
-    const filtered = sandboxPredictions.filter(p => p.confidence >= confThreshold);
-    
-    // Preserve any user-drawn boxes (those without confidence field)
-    const userBoxes = boxes.filter(b => b.confidence === undefined);
-    
-    // Convert filtered predictions to box objects
-    const predBoxes = filtered.map((p, i) => ({
-        id: 10000 + i, // high IDs to avoid collision with user-drawn ones
-        class_label: p.class_label,
-        x_c: p.x_center,
-        y_c: p.y_center,
-        w: p.width,
-        h: p.height,
-        confidence: p.confidence,
-        selected: false
-    }));
-    
-    boxes = [...predBoxes, ...userBoxes];
-    selectedBoxId = null;
-    sandboxSelectBox(null);
-    
-    updateSandboxBreakdown();
-    redrawOverlay();
-}
-
-function updateSandboxBreakdown() {
-    // Update stats
-    sandboxDetCount.textContent = sandboxPredictions.length;
-    sandboxVisCount.textContent = boxes.length;
-    
-    if (boxes.length > 0 || sandboxPredictions.length > 0) {
-        sandboxResultsEmpty.classList.add('hidden');
-        sandboxResultsList.classList.remove('hidden');
-        renderBreakdown(boxes);
-    } else {
-        sandboxResultsEmpty.classList.remove('hidden');
-        sandboxResultsList.classList.add('hidden');
-    }
-}
-
-function renderBreakdown(visibleBoxes) {
-    // Aggregate by class
-    const counts = {};
-    visibleBoxes.forEach(b => {
-        counts[b.class_label] = (counts[b.class_label] || 0) + 1;
-    });
-    
-    // Build unique class list for consistent coloring
-    const allClasses = [...new Set(visibleBoxes.map(b => b.class_label))];
-    
-    sandboxBreakdown.innerHTML = '';
-    allClasses.forEach((cls, i) => {
-        const count = counts[cls] || 0;
-        const color = CLASS_COLORS[i % CLASS_COLORS.length];
-        
-        const row = document.createElement('div');
-        row.className = 'det-class-row';
-        row.innerHTML = `
-            <span class="det-class-swatch" style="background: ${color};"></span>
-            <span class="det-class-name">${cls}</span>
-            <span class="det-class-count">${count}</span>
-        `;
-        sandboxBreakdown.appendChild(row);
-    });
-}
-
-// --- Save Corrections to Replay Buffer ---
-async function saveCorrections() {
-    if (!sandboxFilenameOnServer || boxes.length === 0) return;
-    
-    const btn = btnSaveCorrections;
-    const btnSpan = btn.querySelector('span');
-    btn.disabled = true;
-    btnSpan.textContent = 'Saving...';
-    
-    try {
-        const payload = {
-            sandbox_filename: sandboxFilenameOnServer,
-            annotations: boxes.map(b => ({
-                class_label: b.class_label,
-                x_center: b.x_c,
-                y_center: b.y_c,
-                width: b.w,
-                height: b.h,
-                confidence: 1.0 // all corrections are treated as ground truth
-            }))
-        };
-        
-        const res = await fetch('/api/test/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.detail || `Save failed`);
-        }
-        
-        const data = await res.json();
-        
-        // Show success toast
-        showToast(`✓ ${data.message}`);
-        
-        tileStatus.textContent = 'Saved! Upload another image to continue.';
-        tileStatus.style.color = 'var(--accent-success)';
-        
-        btnSpan.textContent = 'Saved ✓';
-        
-        // After 2 seconds, re-enable for another upload
-        setTimeout(() => {
-            btnSpan.textContent = 'Save Corrections & Learn';
-            btn.disabled = true;
-        }, 2000);
-        
-    } catch (err) {
-        console.error('Save error:', err);
-        showToast(`✗ Error: ${err.message}`);
-        btn.disabled = false;
-        btnSpan.textContent = 'Save Corrections & Learn';
-    }
-}
-
-function showToast(message) {
-    // Remove existing toast
-    const existing = document.querySelector('.toast');
-    if (existing) existing.remove();
-    
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    // Trigger animation
-    requestAnimationFrame(() => {
-        toast.classList.add('show');
-    });
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 400);
-    }, 3000);
-}
-
-// --- Canvas Interactions ---
-function getActualCoords(e) {
-    const rect = overlayCanvas.getBoundingClientRect();
-    const scaleX = overlayCanvas.width / rect.width;
-    const scaleY = overlayCanvas.height / rect.height;
-    return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY
-    };
-}
-
-function onMouseDown(e) {
-    // In sandbox mode, require image to be loaded
-    if (appMode === 'sandbox' && !sandboxImageLoaded) return;
-    // In AL mode, require tile to be loaded
-    if (appMode === 'al' && !currentTile) return;
-    
-    const {x, y} = getActualCoords(e);
-
-    if (currentMode === 'draw') {
-        isDrawing = true;
-        drawStartX = x;
-        drawStartY = y;
-        drawCurrentX = x;
-        drawCurrentY = y;
-    } else if (currentMode === 'move') {
-        const clickedBox = getBoxAtPosition(x, y);
-        
-        if (appMode === 'sandbox') {
-            sandboxSelectBox(clickedBox ? clickedBox.id : null);
-        } else {
-            selectBox(clickedBox ? clickedBox.id : null);
-        }
-        
-        if (clickedBox) {
-            isDragging = true;
-            dragStartX = x;
-            dragStartY = y;
-        }
-    }
-}
-
-function onMouseMove(e) {
-    if (appMode === 'sandbox' && !sandboxImageLoaded) return;
-    if (appMode === 'al' && !currentTile) return;
-    
-    const {x, y} = getActualCoords(e);
-
-    if (isDrawing) {
-        drawCurrentX = x;
-        drawCurrentY = y;
-        redrawOverlay();
-        
-        // Draw the temporary box
-        ctxOverlay.strokeStyle = 'rgba(255,255,255,0.8)';
-        ctxOverlay.lineWidth = 2;
-        ctxOverlay.setLineDash([5, 5]);
-        ctxOverlay.strokeRect(
-            drawStartX, 
-            drawStartY, 
-            drawCurrentX - drawStartX, 
-            drawCurrentY - drawStartY
-        );
-        ctxOverlay.setLineDash([]);
-        
-    } else if (isDragging && selectedBoxId !== null) {
-        const dx = (x - dragStartX) / overlayCanvas.width;
-        const dy = (y - dragStartY) / overlayCanvas.height;
-        
-        const b = boxes.find(bx => bx.id === selectedBoxId);
-        if (b) {
-            b.x_c += dx;
-            b.y_c += dy;
-            if (appMode === 'sandbox') {
-                sandboxCorrected = true;
-                btnSaveCorrections.disabled = false;
-            }
-        }
-        
-        dragStartX = x;
-        dragStartY = y;
-        redrawOverlay();
-    } else {
-        // Just hover crosshairs
-        redrawOverlay();
-        drawCrosshairs(x, y);
-    }
-}
-
-function onMouseUp(e) {
-    if (isDrawing) {
-        isDrawing = false;
-        
-        const width = Math.abs(drawCurrentX - drawStartX);
-        const height = Math.abs(drawCurrentY - drawStartY);
-        
-        if (width > 5 && height > 5) {
-            const minX = Math.min(drawStartX, drawCurrentX);
-            const minY = Math.min(drawStartY, drawCurrentY);
-            
-            // Normalize
-            const w_n = width / overlayCanvas.width;
-            const h_n = height / overlayCanvas.height;
-            const xc_n = (minX / overlayCanvas.width) + (w_n / 2);
-            const yc_n = (minY / overlayCanvas.height) + (h_n / 2);
-            
-            const newBoxId = boxIdCounter++;
-            const defaultClass = taxonomy.length > 0 ? taxonomy[0] : "Benign";
-
-            const newBox = {
-                id: newBoxId,
-                class_label: defaultClass,
-                x_c: xc_n,
-                y_c: yc_n,
-                w: w_n,
-                h: h_n,
-                selected: false
-                // NOTE: no `confidence` key — marks this as a user-drawn box
-            };
-            
-            boxes.push(newBox);
-            
-            if (appMode === 'sandbox') {
-                sandboxCorrected = true;
-                btnSaveCorrections.disabled = false;
-                // Auto-select the new box so user can set class
-                setSandboxMode('move');
-                sandboxSelectBox(newBoxId);
-                updateSandboxBreakdown();
-            } else {
-                updateSidebar();
-            }
-        }
-        redrawOverlay();
-    }
-    
-    isDragging = false;
-}
-
-// --- Helper Functions ---
-function getBoxAtPosition(px, py) {
-    for (let i = boxes.length - 1; i >= 0; i--) {
-        const b = boxes[i];
-        const bw = b.w * overlayCanvas.width;
-        const bh = b.h * overlayCanvas.height;
-        const bx = (b.x_c * overlayCanvas.width) - (bw / 2);
-        const by = (b.y_c * overlayCanvas.height) - (bh / 2);
-        
-        if (px >= bx && px <= bx + bw && py >= by && py <= by + bh) {
-            return b;
-        }
-    }
-    return null;
-}
-
-function selectBox(id) {
-    selectedBoxId = id;
-    boxes.forEach(b => b.selected = (b.id === id));
-    updateSidebar();
-    redrawOverlay();
-}
-
-function updateSidebar() {
-    statBoxes.textContent = boxes.length;
-    
-    if (selectedBoxId !== null) {
-        controlsEmpty.classList.add('hidden');
-        controlsActive.classList.remove('hidden');
-        const b = boxes.find(bx => bx.id === selectedBoxId);
-        classSelect.value = b.class_label;
-    } else {
-        controlsEmpty.classList.remove('hidden');
-        controlsActive.classList.add('hidden');
-    }
+function colorForBox(box, boxes) {
+  if (box.selected) {
+    return "#f59e0b";
+  }
+  if (appMode === "sandbox") {
+    const classes = [
+      ...new Set(
+        boxes.map(
+          (item) => item.class_label
+        )
+      )
+    ];
+    return CLASS_COLORS[
+      Math.max(
+        0,
+        classes.indexOf(
+          box.class_label
+        )
+      ) % CLASS_COLORS.length
+    ];
+  }
+  return "#22c55e";
 }
 
 function redrawOverlay() {
-    ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-    
-    const cw = overlayCanvas.width;
-    const ch = overlayCanvas.height;
-    
-    // Build class color map for sandbox mode
-    const allClasses = appMode === 'sandbox'
-        ? [...new Set(boxes.map(b => b.class_label))]
-        : [];
-    
-    boxes.forEach(b => {
-        const bw = b.w * cw;
-        const bh = b.h * ch;
-        const bx = (b.x_c * cw) - (bw / 2);
-        const by = (b.y_c * ch) - (bh / 2);
-        
-        // Pick color
-        let strokeColor;
-        if (appMode === 'sandbox') {
-            const classIdx = allClasses.indexOf(b.class_label);
-            strokeColor = CLASS_COLORS[classIdx % CLASS_COLORS.length];
-        } else {
-            strokeColor = b.selected ? '#fbbf24' : '#34d399';
-        }
+  ctxOverlay.clearRect(
+    0,
+    0,
+    els.overlayCanvas.width,
+    els.overlayCanvas.height
+  );
+  if (!currentImage()) {
+    return;
+  }
 
-        // Styling
-        ctxOverlay.lineWidth = b.selected ? 3 : 2;
-        ctxOverlay.strokeStyle = strokeColor;
-        
-        // Shadow / Glow for selected
-        if (b.selected) {
-            ctxOverlay.shadowColor = 'rgba(251, 191, 36, 0.8)';
-            ctxOverlay.shadowBlur = 12;
-        } else {
-            ctxOverlay.shadowBlur = 0;
-        }
+  const boxes = visibleBoxes();
+  const cw = els.overlayCanvas.width;
+  const ch = els.overlayCanvas.height;
 
-        ctxOverlay.strokeRect(bx, by, bw, bh);
-        
-        // Draw Label Tag
-        ctxOverlay.shadowBlur = 0;
-        
-        let tagText = b.class_label;
-        if (appMode === 'sandbox' && b.confidence !== undefined) {
-            tagText += ` ${(b.confidence * 100).toFixed(0)}%`;
-        }
-        if (b.confidence === undefined) {
-            tagText += ' ✎'; // mark user-drawn boxes
-        }
-        
-        ctxOverlay.font = "bold 13px 'Outfit'";
-        const textM = ctxOverlay.measureText(tagText);
-        const tagW = textM.width + 10;
-        const tagH = 22;
-        const tagX = bx;
-        const tagY = by - tagH;
-        
-        // Tag background
-        ctxOverlay.fillStyle = strokeColor;
-        ctxOverlay.beginPath();
-        if (ctxOverlay.roundRect) {
-            ctxOverlay.roundRect(tagX, tagY, tagW, tagH, [4, 4, 0, 0]);
-        } else {
-            ctxOverlay.rect(tagX, tagY, tagW, tagH);
-        }
-        ctxOverlay.fill();
-        
-        // Tag text
-        ctxOverlay.fillStyle = "#000";
-        ctxOverlay.fillText(tagText, tagX + 5, tagY + 15);
-    });
-}
+  boxes.forEach((box) => {
+    const bw = box.w * cw;
+    const bh = box.h * ch;
+    const bx = box.x_c * cw - bw / 2;
+    const by = box.y_c * ch - bh / 2;
+    const color = colorForBox(
+      box,
+      boxes
+    );
 
-function drawCrosshairs(x, y) {
-    ctxOverlay.shadowBlur = 0;
-    ctxOverlay.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctxOverlay.lineWidth = 1;
+    ctxOverlay.strokeStyle = color;
+    ctxOverlay.lineWidth =
+      box.selected ? 3 : 2;
+    ctxOverlay.strokeRect(
+      bx,
+      by,
+      bw,
+      bh
+    );
 
-    ctxOverlay.beginPath();
-    ctxOverlay.moveTo(x, 0);
-    ctxOverlay.lineTo(x, overlayCanvas.height);
-    ctxOverlay.moveTo(0, y);
-    ctxOverlay.lineTo(overlayCanvas.width, y);
-    ctxOverlay.stroke();
-}
-
-// --- Sync ---
-async function saveAndNext() {
-    if (!currentTile) return;
-    
-    try {
-        btnSave.disabled = true;
-        btnSave.querySelector('span').textContent = "Saving...";
-
-        const payload = {
-            annotations: boxes.map(b => ({
-                class_label: b.class_label,
-                x_center: b.x_c,
-                y_center: b.y_c,
-                width: b.w,
-                height: b.h
-            }))
-        };
-
-        const res = await fetch(`/api/tile/${currentTile.id}/save`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) throw new Error("Save failed");
-
-        btnSave.querySelector('span').textContent = "Save & Next";
-        
-        await fetchNextTile();
-
-    } catch (e) {
-        console.error(e);
-        alert("Failed to save annotations!");
-        btnSave.disabled = false;
-        btnSave.querySelector('span').textContent = "Save & Next";
+    let label = box.class_label;
+    if (
+      box.source === "prediction"
+    ) {
+      label += ` ${Math.round(
+        box.confidence * 100
+      )}%`;
     }
+    if (box.source === "manual") {
+      label += " *";
+    }
+
+    ctxOverlay.font =
+      "600 13px system-ui";
+    const tagW =
+      ctxOverlay.measureText(label).width
+      + 10;
+    const tagH = 21;
+    const tagY = Math.max(
+      0,
+      by - tagH
+    );
+    ctxOverlay.fillStyle = color;
+    ctxOverlay.fillRect(
+      bx,
+      tagY,
+      tagW,
+      tagH
+    );
+    ctxOverlay.fillStyle = "#fff";
+    ctxOverlay.fillText(
+      label,
+      bx + 5,
+      tagY + 15
+    );
+  });
 }
 
-// Start
-window.addEventListener('DOMContentLoaded', init);
+function canvasCoords(event) {
+  const rect =
+    els.overlayCanvas.getBoundingClientRect();
+  return {
+    x: (
+      event.clientX - rect.left
+    ) * (
+      els.overlayCanvas.width
+      / rect.width
+    ),
+    y: (
+      event.clientY - rect.top
+    ) * (
+      els.overlayCanvas.height
+      / rect.height
+    )
+  };
+}
+
+function boxAt(x, y) {
+  const boxes = visibleBoxes();
+  for (
+    let i = boxes.length - 1;
+    i >= 0;
+    i -= 1
+  ) {
+    const box = boxes[i];
+    const bw =
+      box.w * els.overlayCanvas.width;
+    const bh =
+      box.h * els.overlayCanvas.height;
+    const bx =
+      box.x_c * els.overlayCanvas.width
+      - bw / 2;
+    const by =
+      box.y_c * els.overlayCanvas.height
+      - bh / 2;
+
+    if (
+      x >= bx
+      && x <= bx + bw
+      && y >= by
+      && y <= by + bh
+    ) {
+      return box;
+    }
+  }
+  return null;
+}
+
+function activeTool() {
+  return appMode === "al"
+    ? alToolMode
+    : sandboxToolMode;
+}
+
+function interactionAllowed() {
+  return appMode === "al"
+    ? Boolean(
+      currentTile && alImageReady
+    )
+    : sandboxImageLoaded;
+}
+
+function onPointerDown(event) {
+  if (!interactionAllowed()) {
+    return;
+  }
+
+  const point = canvasCoords(event);
+  pointerId = event.pointerId;
+  els.overlayCanvas.setPointerCapture?.(
+    event.pointerId
+  );
+
+  if (activeTool() === "draw") {
+    isDrawing = true;
+    drawStart = point;
+    drawCurrent = point;
+  } else {
+    const hit = boxAt(
+      point.x,
+      point.y
+    );
+    setSelectedId(
+      hit ? hit.id : null
+    );
+    if (hit) {
+      isDragging = true;
+      dragPrevious = point;
+    }
+  }
+}
+
+function onPointerMove(event) {
+  if (!interactionAllowed()) {
+    return;
+  }
+
+  const point = canvasCoords(event);
+  if (isDrawing) {
+    drawCurrent = point;
+    redrawOverlay();
+    ctxOverlay.setLineDash([5, 5]);
+    ctxOverlay.strokeStyle = "#fff";
+    ctxOverlay.lineWidth = 2;
+    ctxOverlay.strokeRect(
+      drawStart.x,
+      drawStart.y,
+      point.x - drawStart.x,
+      point.y - drawStart.y
+    );
+    ctxOverlay.setLineDash([]);
+  } else if (
+    isDragging
+    && currentSelectedId() !== null
+  ) {
+    const box = currentBoxes().find(
+      (item) => (
+        item.id === currentSelectedId()
+      )
+    );
+    if (box) {
+      const dx = (
+        point.x - dragPrevious.x
+      ) / els.overlayCanvas.width;
+      const dy = (
+        point.y - dragPrevious.y
+      ) / els.overlayCanvas.height;
+
+      box.x_c = Math.max(
+        box.w / 2,
+        Math.min(
+          1 - box.w / 2,
+          box.x_c + dx
+        )
+      );
+      box.y_c = Math.max(
+        box.h / 2,
+        Math.min(
+          1 - box.h / 2,
+          box.y_c + dy
+        )
+      );
+    }
+    dragPrevious = point;
+    redrawOverlay();
+  }
+}
+
+function finishPointer(event) {
+  if (
+    pointerId !== null
+    && event.pointerId !== pointerId
+  ) {
+    return;
+  }
+
+  if (isDrawing) {
+    const width = Math.abs(
+      drawCurrent.x - drawStart.x
+    );
+    const height = Math.abs(
+      drawCurrent.y - drawStart.y
+    );
+
+    if (
+      width > 5
+      && height > 5
+    ) {
+      const minX = Math.min(
+        drawStart.x,
+        drawCurrent.x
+      );
+      const minY = Math.min(
+        drawStart.y,
+        drawCurrent.y
+      );
+      const w =
+        width / els.overlayCanvas.width;
+      const h =
+        height / els.overlayCanvas.height;
+
+      const box = {
+        id: nextBoxId++,
+        class_label:
+          taxonomy[0] || "Benign",
+        x_c:
+          minX
+          / els.overlayCanvas.width
+          + w / 2,
+        y_c:
+          minY
+          / els.overlayCanvas.height
+          + h / 2,
+        w,
+        h,
+        selected: false,
+        source: "manual"
+      };
+
+      currentBoxes().push(box);
+      if (
+        appMode === "sandbox"
+      ) {
+        sandboxToolMode = "move";
+        selectedSandboxId = box.id;
+        sandboxBoxes.forEach(
+          (item) => {
+            item.selected =
+              item.id === box.id;
+          }
+        );
+      }
+      updateToolButtons();
+      updatePanels();
+    }
+  }
+
+  isDrawing = false;
+  isDragging = false;
+  pointerId = null;
+  redrawOverlay();
+}
+
+function resetSandbox() {
+  sandboxBoxes = [];
+  predictionCount = 0;
+  selectedSandboxId = null;
+  sandboxFilenameOnServer = null;
+  sandboxImageLoaded = false;
+  sandboxImageReady = false;
+  sandboxImage.removeAttribute("src");
+  els.sandboxFilename.textContent =
+    "No image loaded";
+  els.btnSaveCorrections.disabled =
+    true;
+  els.dropzone.classList.remove(
+    "hidden"
+  );
+  setStatus(
+    "Sandbox — upload an image",
+    "warning"
+  );
+  updatePanels();
+  renderCurrentImage();
+}
+
+async function handleSandboxFile(file) {
+  if (!file) {
+    return;
+  }
+
+  const validTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/bmp",
+    "image/tiff",
+    "image/webp"
+  ];
+  if (!validTypes.includes(file.type)) {
+    showToast(
+      "Unsupported image type."
+    );
+    return;
+  }
+  if (
+    file.size
+    > maxUploadMb * 1024 * 1024
+  ) {
+    showToast(
+      `Image exceeds ${maxUploadMb} MB.`
+    );
+    return;
+  }
+
+  sandboxBoxes = [];
+  selectedSandboxId = null;
+  predictionCount = 0;
+  sandboxFilenameOnServer = null;
+  els.btnSaveCorrections.disabled =
+    true;
+  els.dropzone.classList.add(
+    "hidden"
+  );
+  els.inferenceSpinner.classList.remove(
+    "hidden"
+  );
+  els.sandboxFilename.textContent =
+    file.name;
+  setStatus(
+    "Running inference…",
+    "primary"
+  );
+
+  const localUrl =
+    URL.createObjectURL(file);
+
+  try {
+    await loadImage(
+      sandboxImage,
+      localUrl
+    );
+    sandboxImageReady = true;
+    renderCurrentImage();
+
+    const form = new FormData();
+    form.append("file", file);
+    const data = await fetchJSON(
+      "/api/test/upload",
+      {
+        method: "POST",
+        body: form
+      }
+    );
+
+    sandboxFilenameOnServer =
+      data.sandbox_filename;
+    sandboxBoxes = (
+      data.predictions || []
+    ).map((prediction) => ({
+      id: nextBoxId++,
+      class_label:
+        prediction.class_label,
+      x_c: prediction.x_center,
+      y_c: prediction.y_center,
+      w: prediction.width,
+      h: prediction.height,
+      confidence:
+        prediction.confidence,
+      selected: false,
+      source: "prediction"
+    }));
+    predictionCount =
+      sandboxBoxes.length;
+    sandboxImageLoaded = true;
+    els.btnSaveCorrections.disabled =
+      false;
+    setStatus(
+      `Sandbox — ${predictionCount} model detection(s)`,
+      "success"
+    );
+    updatePanels();
+    redrawOverlay();
+  } catch (error) {
+    sandboxImageLoaded = false;
+    sandboxFilenameOnServer = null;
+    els.dropzone.classList.remove(
+      "hidden"
+    );
+    setStatus(
+      error.message,
+      "danger"
+    );
+    showToast(error.message);
+  } finally {
+    URL.revokeObjectURL(localUrl);
+    els.inferenceSpinner.classList.add(
+      "hidden"
+    );
+  }
+}
+
+async function saveSandbox() {
+  if (!sandboxFilenameOnServer) {
+    return;
+  }
+
+  const visible =
+    visibleSandboxBoxes();
+  els.btnSaveCorrections.disabled =
+    true;
+  els.btnSaveCorrections.textContent =
+    "Saving…";
+
+  try {
+    const data = await fetchJSON(
+      "/api/test/save",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          sandbox_filename:
+            sandboxFilenameOnServer,
+          annotations: visible.map(
+            (box) => ({
+              class_label:
+                box.class_label,
+              x_center: box.x_c,
+              y_center: box.y_c,
+              width: box.w,
+              height: box.h,
+              confidence: 1.0
+            })
+          )
+        })
+      }
+    );
+
+    showToast(
+      data.message
+      || "Saved for the next training cycle."
+    );
+    sandboxFilenameOnServer = null;
+    els.btnSaveCorrections.textContent =
+      "Saved";
+    setStatus(
+      "Saved for next training cycle",
+      "success"
+    );
+  } catch (error) {
+    els.btnSaveCorrections.disabled =
+      false;
+    setStatus(
+      error.message,
+      "danger"
+    );
+    showToast(error.message);
+  } finally {
+    window.setTimeout(
+      () => {
+        els.btnSaveCorrections.textContent =
+          "Save for next training";
+      },
+      1200
+    );
+  }
+}
+
+async function saveAndNext() {
+  if (!currentTile) {
+    return;
+  }
+
+  els.btnSave.disabled = true;
+  els.btnSave.textContent =
+    "Saving…";
+  try {
+    await fetchJSON(
+      `/api/tile/${currentTile.id}/save`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          annotations: alBoxes.map(
+            (box) => ({
+              class_label:
+                box.class_label,
+              x_center: box.x_c,
+              y_center: box.y_c,
+              width: box.w,
+              height: box.h,
+              confidence: 1.0
+            })
+          )
+        })
+      }
+    );
+    await fetchNextTile();
+  } catch (error) {
+    els.btnSave.disabled = false;
+    setStatus(
+      error.message,
+      "danger"
+    );
+    showToast(error.message);
+  } finally {
+    els.btnSave.textContent =
+      "Save & next";
+  }
+}
+
+function showToast(message) {
+  document.querySelectorAll(
+    ".toast"
+  ).forEach(
+    (node) => node.remove()
+  );
+
+  const toast =
+    document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  toast.setAttribute(
+    "role",
+    "status"
+  );
+  document.body.appendChild(toast);
+  requestAnimationFrame(
+    () => toast.classList.add("show")
+  );
+  window.setTimeout(
+    () => {
+      toast.classList.remove("show");
+      window.setTimeout(
+        () => toast.remove(),
+        250
+      );
+    },
+    3000
+  );
+}
+
+function setupTheme() {
+  const saved =
+    localStorage.getItem(
+      "blast-theme"
+    );
+  const preferred = saved || (
+    window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches
+      ? "dark"
+      : "light"
+  );
+  document.documentElement.dataset.theme =
+    preferred;
+  updateThemeButton();
+}
+
+function updateThemeButton() {
+  const dark =
+    document.documentElement.dataset.theme
+    === "dark";
+  els.themeToggle.textContent =
+    dark ? "☀" : "◐";
+  els.themeToggle.setAttribute(
+    "aria-label",
+    dark
+      ? "Switch to light theme"
+      : "Switch to dark theme"
+  );
+}
+
+function toggleTheme() {
+  const next =
+    document.documentElement.dataset.theme
+    === "dark"
+      ? "light"
+      : "dark";
+  document.documentElement.dataset.theme =
+    next;
+  localStorage.setItem(
+    "blast-theme",
+    next
+  );
+  updateThemeButton();
+}
+
+function setupEvents() {
+  els.modeAl.addEventListener(
+    "click",
+    () => switchMode("al")
+  );
+  els.modeSandbox.addEventListener(
+    "click",
+    () => switchMode("sandbox")
+  );
+  els.themeToggle.addEventListener(
+    "click",
+    toggleTheme
+  );
+
+  els.toolDraw.addEventListener(
+    "click",
+    () => {
+      appMode = "al";
+      setTool("draw");
+    }
+  );
+  els.toolMove.addEventListener(
+    "click",
+    () => {
+      appMode = "al";
+      setTool("move");
+    }
+  );
+  els.sandboxToolDraw.addEventListener(
+    "click",
+    () => {
+      appMode = "sandbox";
+      setTool("draw");
+    }
+  );
+  els.sandboxToolMove.addEventListener(
+    "click",
+    () => {
+      appMode = "sandbox";
+      setTool("move");
+    }
+  );
+
+  els.btnClear.addEventListener(
+    "click",
+    () => {
+      alBoxes = [];
+      selectedAlId = null;
+      updatePanels();
+      redrawOverlay();
+    }
+  );
+  els.btnClearSandbox.addEventListener(
+    "click",
+    resetSandbox
+  );
+
+  els.btnDeleteBox.addEventListener(
+    "click",
+    () => {
+      alBoxes = alBoxes.filter(
+        (box) => (
+          box.id !== selectedAlId
+        )
+      );
+      selectedAlId = null;
+      updatePanels();
+      redrawOverlay();
+    }
+  );
+  els.btnDeleteSandboxBox.addEventListener(
+    "click",
+    () => {
+      sandboxBoxes =
+        sandboxBoxes.filter(
+          (box) => (
+            box.id !== selectedSandboxId
+          )
+        );
+      selectedSandboxId = null;
+      updatePanels();
+      redrawOverlay();
+    }
+  );
+
+  els.classSelect.addEventListener(
+    "change",
+    () => {
+      const box = alBoxes.find(
+        (item) => (
+          item.id === selectedAlId
+        )
+      );
+      if (box) {
+        box.class_label =
+          els.classSelect.value;
+      }
+      redrawOverlay();
+    }
+  );
+  els.sandboxClassSelect.addEventListener(
+    "change",
+    () => {
+      const box = sandboxBoxes.find(
+        (item) => (
+          item.id === selectedSandboxId
+        )
+      );
+      if (box) {
+        box.class_label =
+          els.sandboxClassSelect.value;
+      }
+      updatePanels();
+      redrawOverlay();
+    }
+  );
+
+  els.confSlider.addEventListener(
+    "input",
+    () => {
+      confidenceThreshold =
+        Number(
+          els.confSlider.value
+        ) / 100;
+      els.confValue.textContent =
+        confidenceThreshold.toFixed(2);
+      updatePanels();
+      redrawOverlay();
+    }
+  );
+
+  els.btnSave.addEventListener(
+    "click",
+    saveAndNext
+  );
+  els.btnSaveCorrections.addEventListener(
+    "click",
+    saveSandbox
+  );
+  els.btnUpload.addEventListener(
+    "click",
+    () => els.fileUpload.click()
+  );
+  els.dropzone.addEventListener(
+    "click",
+    () => els.fileUpload.click()
+  );
+  els.fileUpload.addEventListener(
+    "change",
+    () => {
+      handleSandboxFile(
+        els.fileUpload.files?.[0]
+      );
+      els.fileUpload.value = "";
+    }
+  );
+
+  els.dropzone.addEventListener(
+    "dragover",
+    (event) => {
+      event.preventDefault();
+      els.dropzone.classList.add(
+        "drag-over"
+      );
+    }
+  );
+  els.dropzone.addEventListener(
+    "dragleave",
+    () => {
+      els.dropzone.classList.remove(
+        "drag-over"
+      );
+    }
+  );
+  els.dropzone.addEventListener(
+    "drop",
+    (event) => {
+      event.preventDefault();
+      els.dropzone.classList.remove(
+        "drag-over"
+      );
+      handleSandboxFile(
+        event.dataTransfer
+          ?.files?.[0]
+      );
+    }
+  );
+
+  els.overlayCanvas.addEventListener(
+    "pointerdown",
+    onPointerDown
+  );
+  els.overlayCanvas.addEventListener(
+    "pointermove",
+    onPointerMove
+  );
+  els.overlayCanvas.addEventListener(
+    "pointerup",
+    finishPointer
+  );
+  els.overlayCanvas.addEventListener(
+    "pointercancel",
+    finishPointer
+  );
+}
+
+async function init() {
+  setupTheme();
+  setupEvents();
+  updateToolButtons();
+
+  try {
+    await fetchConfig();
+    await fetchNextTile();
+  } catch (error) {
+    setStatus(
+      error.message,
+      "danger"
+    );
+    showToast(error.message);
+  }
+}
+
+document.addEventListener(
+  "DOMContentLoaded",
+  init
+);
