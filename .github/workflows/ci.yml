@@ -2,12 +2,9 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - audit/blast-detection-algo
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -16,8 +13,8 @@ jobs:
   core-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -30,19 +27,19 @@ jobs:
             pydantic-settings==2.7.1 \
             PyYAML==6.0.2 \
             loguru==0.7.3 \
-            pytest==8.3.4
+            pytest==9.1.1
       - name: Compile Python sources
         run: python -m compileall -q .
-      - name: Replay buffer tests
-        run: pytest -q tests/test_replay_buffer.py
+      - name: Run tests
+        run: pytest -q tests
       - name: JavaScript syntax check
         run: node --check public/app.js
 
   dependency-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Audit pinned dependencies
