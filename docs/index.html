@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Deep learning leukemic blast detection and classification engine trained on 25,875 hematology microscopy fields (115,548 annotated cells). Features PyTorch YOLOv8 detection, sliding-window WSI inference, and Human-in-the-Loop active learning.">
+  <title>Leukemic Blast Detection & Subtyping Intelligence Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;850&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="./">
+    <span class="brand-dot"></span>
+    Blast Detection <span>AL Engine</span>
+  </a>
+  <nav aria-label="Primary Navigation">
+    <a href="#results">Validation Results</a>
+    <a href="#visuals">Detection Gallery</a>
+    <a href="#datalake">Clinical Datalake</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#clinical">Hematopathology</a>
+    <a href="#quickstart">Quickstart</a>
+    <a class="repo" href="https://github.com/abusuraihsakhri/blast-detection-algo">GitHub Repository</a>
+    <button id="theme" type="button" aria-label="Toggle color theme">◐</button>
+  </nav>
+</header>
+
+<main>
+<!-- HERO SECTION -->
+<section class="hero">
+  <div>
+    <p class="eyebrow">HEMATOPATHOLOGY · DIGITAL PATHOLOGY · HITL ACTIVE LEARNING</p>
+    <h1>Deep learning system for <em>Leukemic Blast Detection.</em></h1>
+    <p class="lede">A clinical-grade, GPU-accelerated PyTorch system trained on <strong>25,875 microscopy fields</strong> with <strong>115,548 expert-annotated cells</strong> across 6 global cohorts. Engineered for rapid morphological detection and subtyping of Acute Lymphoblastic Leukemia (B-ALL stages: Early, Pre, Pro) and Acute Myeloid Leukemia (AML / Myeloblast) in Whole Slide Images (WSIs) and peripheral blood smears.</p>
+    
+    <div class="actions">
+      <a class="primary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0">Download Model Weights (v1.0.0)</a>
+      <a class="secondary" href="https://github.com/abusuraihsakhri/blast-detection-algo">View Source Code</a>
+      <a class="secondary" href="#results">Validation Metrics ↓</a>
+    </div>
+  </div>
+
+  <aside class="status-card" aria-label="Pipeline Specifications">
+    <div class="status-head">
+      <span class="brand-dot"></span>
+      Trained & Audited Research System
+    </div>
+    <dl>
+      <div><dt>Datalake Scale</dt><dd>25,875 Fields / Images</dd></div>
+      <div><dt>Annotated Cells</dt><dd>115,548 Bounding Boxes</dd></div>
+      <div><dt>Peak mAP@50</dt><dd>92.23% (0.9223)</dd></div>
+      <div><dt>Precision ($P$)</dt><dd>88.40% (0.8840)</dd></div>
+      <div><dt>Recall ($R$)</dt><dd>89.93% (0.8993)</dd></div>
+      <div><dt>mAP@50-95</dt><dd>71.86% (0.7186)</dd></div>
+      <div><dt>Parameters</dt><dd>3.01 Million (YOLOv8n)</dd></div>
+      <div><dt>Inference Latency</dt><dd>1.2 – 2.8 ms / tile</dd></div>
+      <div><dt>Active Learning</dt><dd>Experience Replay Buffer</dd></div>
+      <div><dt>WSI Inference</dt><dd>Sliding Window + Global NMS</dd></div>
+    </dl>
+  </aside>
+</section>
+
+<!-- EMPIRICAL VALIDATION RESULTS -->
+<section id="results" class="section">
+  <p class="eyebrow">EXPERIMENTAL BENCHMARKS & EMPIRICAL VALIDATION</p>
+  <h2>20-Epoch Warm-Start Convergence & Evaluation</h2>
+  <p class="lede">The baseline detector was trained and cross-validated on the unified multi-center datalake. It achieved peak convergence at epoch 10 with <strong>92.23% mAP@50</strong> and balanced sensitivity across lymphoid and myeloid blast morphology.</p>
+
+  <div class="metric-grid">
+    <div class="metric-box">
+      <div class="metric-value">92.23%</div>
+      <div class="metric-label">mAP@50</div>
+      <div class="metric-detail">High sensitivity across blast subtypes</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">88.40%</div>
+      <div class="metric-label">Precision ($P$)</div>
+      <div class="metric-detail">Suppresses false alarms on normal WBCs</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">89.93%</div>
+      <div class="metric-label">Recall ($R$)</div>
+      <div class="metric-detail">Robust capture of rare and atypical blasts</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">71.86%</div>
+      <div class="metric-label">mAP@50-95</div>
+      <div class="metric-detail">Tight boundary localization on cell contours</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">&lt; 2.5 ms</div>
+      <div class="metric-label">Tile Latency</div>
+      <div class="metric-detail">&gt;400 FPS for real-time gigapixel WSI scan</div>
+    </div>
+  </div>
+
+  <div class="gallery-grid">
+    <div class="gallery-card">
+      <img src="assets/results.png" alt="Training Convergence Curves" loading="lazy">
+      <div class="gallery-card-body">
+        <h4>Loss Convergence & Validation Curves</h4>
+        <p>Box loss, class loss, DFL loss, and precision/recall trajectories over 20 epochs on unified data.</p>
+      </div>
+    </div>
+
+    <div class="gallery-card">
+      <img src="assets/confusion_matrix_normalized.png" alt="Normalized Confusion Matrix" loading="lazy">
+      <div class="gallery-card-body">
+        <h4>Normalized Confusion Matrix</h4>
+        <p>Inter-class discrimination showing clean separation between Benign, Pre-B ALL stages, and Normal WBCs.</p>
+      </div>
+    </div>
+
+    <div class="gallery-card">
+      <img src="assets/BoxPR_curve.png" alt="Precision-Recall Curve" loading="lazy">
+      <div class="gallery-card-body">
+        <h4>Precision-Recall (PR) Curve</h4>
+        <p>Precision-Recall area under curve across all blood cell and blast taxonomy classes.</p>
+      </div>
+    </div>
+
+    <div class="gallery-card">
+      <img src="assets/BoxF1_curve.png" alt="F1-Confidence Calibration Curve" loading="lazy">
+      <div class="gallery-card-body">
+        <h4>F1-Confidence Calibration Curve</h4>
+        <p>Optimal F1 operating point calibrated for pathologist triage thresholding.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VISUAL DETECTION GALLERY -->
+<section id="visuals" class="section">
+  <p class="eyebrow">GROUND TRUTH VS. MODEL INFERENCE</p>
+  <h2>Microscopic Validation Batches</h2>
+  <p class="lede">Compare expert ground-truth annotations against autonomous model predictions across unseen validation fields containing diverse leukemic blast morphologies. Click any panel to view fullscreen.</p>
+
+  <div class="gallery-grid">
+    <div class="gallery-card">
+      <img src="assets/val_batch0_labels.jpg" alt="Validation Batch 0 Ground Truth" loading="lazy">
+      <div class="gallery-card-body">
+        <h4>Validation Batch 0 — Expert Ground Truth</h4>
+        <p>Pathologist manual bounding boxes defining blast stages and normal hematopoietic elements.</p>
+      </div>
+    </div>
+
+    <div class="gallery-card">
+      <img src="assets/val_batch0_pred.jpg" alt="Validation Batch 0 Predictions" loading="lazy">
+      <div class="gallery-card-body">
+        <h4>Validation Batch 0 — Model Inferences</h4>
+        <p>Autonomous YOLOv8n predictions capturing blast boundaries and classifying subtypes accurately.</p>
+      </div>
+    </div>
+
+    <div class="gallery-card">
+      <img src="assets/val_batch1_labels.jpg" alt="Validation Batch 1 Ground Truth" loading="lazy">
+      <div class="gallery-card-body">
+        <h4>Validation Batch 1 — Expert Ground Truth</h4>
+        <p>High-density smear fields with overlapping erythrocytes and mature leukocytes.</p>
+      </div>
+    </div>
+
+    <div class="gallery-card">
+      <img src="assets/val_batch1_pred.jpg" alt="Validation Batch 1 Predictions" loading="lazy">
+      <div class="gallery-card-body">
+        <h4>Validation Batch 1 — Model Inferences</h4>
+        <p>Robust detection under varying Wright-Giemsa stain intensities and optical focus depths.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLINICAL DATALAKE -->
+<section id="datalake" class="section">
+  <p class="eyebrow">MULTI-CENTER DATA CURATION</p>
+  <h2>Aggregated Hematology Datalake (25,875 Images)</h2>
+  <p class="lede">Six international research datasets were unified into a single harmonized 10-class taxonomy spanning lymphoid neoplasms, myeloid neoplasms, and baseline hematological constituents.</p>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Dataset / Cohort</th>
+          <th>Diagnostic Focus</th>
+          <th>Train</th>
+          <th>Valid</th>
+          <th>Test</th>
+          <th>Total Images</th>
+          <th>Annotated Cells</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1</strong></td>
+          <td><strong>Leukemia-NFXZN</strong> (Tawfiq Islam)</td>
+          <td>B-ALL subtyping (Benign, Early, Pre, Pro)</td>
+          <td>6,589</td>
+          <td>622</td>
+          <td>312</td>
+          <td><strong>7,523</strong></td>
+          <td>83,854</td>
+        </tr>
+        <tr>
+          <td><strong>2</strong></td>
+          <td><strong>Blast-Cell-Detection</strong> (YOLOv4)</td>
+          <td>Binary blast vs normal leukocyte differentiation</td>
+          <td>3,011</td>
+          <td>72</td>
+          <td>39</td>
+          <td><strong>3,122</strong></td>
+          <td>3,365</td>
+        </tr>
+        <tr>
+          <td><strong>3</strong></td>
+          <td><strong>BCCD Blood Cell Foundation</strong></td>
+          <td>Normal baseline elements (WBC, RBC, Platelets)</td>
+          <td>377</td>
+          <td>110</td>
+          <td>53</td>
+          <td><strong>540</strong></td>
+          <td>8,851</td>
+        </tr>
+        <tr>
+          <td><strong>4</strong></td>
+          <td><strong>Blood-Cell-znm2t Differential</strong></td>
+          <td>Comprehensive mature leukocyte differential (12 subtypes)</td>
+          <td>9,105</td>
+          <td>389</td>
+          <td>387</td>
+          <td><strong>9,881</strong></td>
+          <td>10,589</td>
+        </tr>
+        <tr>
+          <td><strong>5</strong></td>
+          <td><strong>Acute-Leukemia AML/ALL</strong></td>
+          <td>Myeloblast vs Lymphoblast discrimination</td>
+          <td>3,809</td>
+          <td>0</td>
+          <td>0</td>
+          <td><strong>3,809</strong></td>
+          <td>7,626</td>
+        </tr>
+        <tr>
+          <td><strong>6</strong></td>
+          <td><strong>Myeloblast-fbliw Dedicated</strong></td>
+          <td>Dedicated acute myeloid leukemia (AML) blasts</td>
+          <td>700</td>
+          <td>200</td>
+          <td>100</td>
+          <td><strong>1,000</strong></td>
+          <td>1,263</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3"><strong>Total Multi-Center Datalake</strong></td>
+          <td><strong>23,591</strong></td>
+          <td><strong>1,393</strong></td>
+          <td><strong>891</strong></td>
+          <td><strong>25,875</strong></td>
+          <td><strong>115,548</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <b>Class Distribution</b>
+      <h3>Pre B-ALL Blasts</h3>
+      <p><strong>46,491 instances.</strong> Intermediate lymphoid blasts exhibiting high N:C ratio and condensed chromatin.</p>
+    </div>
+    <div class="card">
+      <b>Class Distribution</b>
+      <h3>Early & Pro B-ALL</h3>
+      <p><strong>27,220 instances</strong> (16,402 Early + 10,818 Pro). Capturing early precursor and late committed lymphoid blast stages.</p>
+    </div>
+    <div class="card">
+      <b>Class Distribution</b>
+      <h3>Myeloblast (AML)</h3>
+      <p><strong>3,003 instances.</strong> Larger myeloid leukemic blasts characterized by moderate basophilic cytoplasm and fine chromatin.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SYSTEM ARCHITECTURE -->
+<section id="architecture" class="section">
+  <p class="eyebrow">ENGINEERING & DEPLOYMENT ARCHITECTURE</p>
+  <h2>End-to-End WSI & Active Learning Flow</h2>
+  <p class="lede">High-throughput gigapixel whole slide processing integrated with a human-in-the-loop experience replay engine to eliminate catastrophic forgetting during incremental fine-tuning.</p>
+
+  <div class="architecture-flow">
+    <div class="arch-node">
+      <span>Input Source</span>
+      <strong>Whole Slide Image</strong>
+      <p>.svs / .ndpi / .tiff gigapixel slide scans</p>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-node">
+      <span>Tiling Engine</span>
+      <strong>Sliding Window</strong>
+      <p>512×512 tiles with 25% overlap & Otsu glass filter</p>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-node">
+      <span>Neural Core</span>
+      <strong>YOLOv8n Backbone</strong>
+      <p>3.01M parameter AMP-accelerated inference</p>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-node">
+      <span>Boundary Suppression</span>
+      <strong>Global NMS</strong>
+      <p>Re-projects local boxes and collapses overlaps</p>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-node">
+      <span>Active Learning</span>
+      <strong>Replay Buffer</strong>
+      <p>Stratified historical sampling with 1.5× boost</p>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <b>Module 1 & 2</b>
+      <h3>Sliding-Window WSI Inference</h3>
+      <p>Extracts overlapping patches using <code>tiffslide</code>, quickly discards clear glass (>80% background threshold), maps tile coordinates to global slide coordinates, and performs vectorized global NMS (IoU = 0.45).</p>
+    </div>
+    <div class="card">
+      <b>Module 3</b>
+      <h3>Experience Replay Buffer</h3>
+      <p>Prevents catastrophic forgetting during pathologist review cycles. Enforces a 4:1 historical-to-new ratio, stratifies across all 10 taxonomy classes, and boosts underrepresented rare blast types by 1.5×.</p>
+    </div>
+    <div class="card">
+      <b>Module 4 & 5</b>
+      <h3>Sandbox Inference & Review UI</h3>
+      <p>Zero-configuration browser tool allowing hematopathologists to drop blood smear images, adjust confidence thresholds in real time, reposition bounding boxes, and save verified labels into the AL queue.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HEMATOPATHOLOGY CRITERIA -->
+<section id="clinical" class="section">
+  <p class="eyebrow">DIAGNOSTIC HEMATOPATHOLOGY CONTEXT</p>
+  <h2>WHO 2022 & FAB Morphological Criteria</h2>
+  <p class="lede">Acute leukemia diagnosis requires rapid distinction between lymphoid and myeloid blast proliferation. Morphological triage flags urgent cases (>20% blast threshold) for expedited flow cytometry and cytogenetic confirmation.</p>
+
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Blast Entity</th>
+          <th>FAB / WHO 2022 Correlate</th>
+          <th>Cytological Characteristics</th>
+          <th>Clinical Significance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag">Early Pre-B</span></td>
+          <td>Pre-B Acute Lymphoblastic Leukemia</td>
+          <td>Small-to-medium blasts, high N:C ratio, dense chromatin, inconspicuous nucleoli</td>
+          <td>Urgent triage; responsive to pediatric B-ALL protocols</td>
+        </tr>
+        <tr>
+          <td><span class="tag">Pre B-ALL</span></td>
+          <td>B-Lymphoblastic Leukemia / Lymphoma</td>
+          <td>Heterogeneous size, clefted/irregular nuclear contours, variable cytoplasm</td>
+          <td>Standard B-ALL presentation requiring immediate risk-stratification</td>
+        </tr>
+        <tr>
+          <td><span class="tag">Pro B-ALL</span></td>
+          <td>Pro-B (CD10-) Precursor B-ALL</td>
+          <td>Immature lymphoid morphology without mature lineage markers</td>
+          <td>Often associated with KMT2A (MLL) gene rearrangements</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-warning">Myeloblast</span></td>
+          <td>Acute Myeloid Leukemia (AML)</td>
+          <td>Large blasts, delicate chromatin, visible nucleoli, rare Auer rods, basophilic cytoplasm</td>
+          <td>Critical medical emergency requiring induction chemotherapy</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-success">Benign / WBC</span></td>
+          <td>Normal Hematopoietic Lineage</td>
+          <td>Segmented neutrophils, band forms, mature lymphocytes, normoblasts</td>
+          <td>Negative baseline controls preventing false alarm escalation</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- QUICKSTART & INFERENCE -->
+<section id="quickstart" class="section">
+  <p class="eyebrow">GETTING STARTED & INFERENCE PIPELINE</p>
+  <h2>Reproducibility & Local Deployment</h2>
+  <p class="lede">The trained model weights are committed directly to the repository and available via GitHub Releases for instant zero-dependency inference.</p>
+
+  <pre><code># 1. Clone repository
+git clone https://github.com/abusuraihsakhri/blast-detection-algo.git
+cd blast-detection-algo
+
+# 2. Setup virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# 3. Model weights are pre-loaded at data/models/active_model.pt
+# Alternatively, download from GitHub Release v1.0.0:
+# curl -L -o data/models/active_model.pt https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/active_model.pt
+
+# 4. Launch the local Human-in-the-Loop review UI
+python app.py
+# Server starts at http://127.0.0.1:8000 with interactive drag-and-drop inference
+
+# 5. Execute WSI sliding-window inference on a whole slide scan (.svs / .tiff)
+python inference_pipeline.py /path/to/slide.svs</code></pre>
+</section>
+</main>
+
+<footer>
+  <div>
+    <strong>Blast Detection AL Engine</strong> · Maintained by <a href="https://github.com/abusuraihsakhri">abusuraihsakhri</a>
+  </div>
+  <div>
+    Research & Investigational Use Only · Not an FDA/CE-IVD Approved Device
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

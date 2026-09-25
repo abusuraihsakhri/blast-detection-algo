@@ -12,12 +12,14 @@ venv/
 *.db-*
 .vscode/
 .idea/
-data/
+
+# Large Datasets, Raw Images, and Temporary Runs
+data/*
+!data/models/
+!data/models/active_model.pt
+!data/models/.gitkeep
 logs/
 runs/
-*.pt
-*.pth
-*.onnx
 *.svs
 *.tif
 *.tiff
@@ -26,3 +28,9 @@ runs/
 _temp_*/
 .DS_Store
 Thumbs.db
+
+# Model Weights (Allow tracking active production model)
+*.pt
+*.pth
+*.onnx
+!data/models/active_model.pt
