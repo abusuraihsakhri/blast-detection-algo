@@ -55,7 +55,7 @@ class AppSettings(BaseSettings):
     max_upload_pixels: int = Field(default=50_000_000, ge=1_000_000)
     sandbox_retention_seconds: int = Field(default=24 * 60 * 60, ge=60)
     allowed_upload_mime_types: List[str] = Field(
-        default=["image/jpeg", "image/png", "image/bmp", "image/tiff", "image/webp"]
+        default=["image/jpeg", "image/png", "image/bmp", "image/webp"]
     )
 
     default_classes: List[str] = Field(
