@@ -2,438 +2,708 @@
 <html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="YOLOv8n leukemic blast detection and classification pipeline trained on 25,875 microscopy fields (115,548 annotated cells). Features PyTorch inference, sliding-window WSI tiling, and Human-in-the-Loop active learning.">
-  <title>Leukemic Blast Detection and Active Learning Pipeline</title>
+  <title>Blast Detection Pipeline · Deep Learning for Leukemic Cell Morphology</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header class="nav">
-  <a class="brand" href="./">
-    <span class="brand-dot"></span>
-    Blast Detection <span>Pipeline</span>
-  </a>
-  <nav aria-label="Primary Navigation">
-    <a href="#results">Validation Results</a>
-    <a href="#visuals">Detection Gallery</a>
-    <a href="#datalake">Dataset Curation</a>
-    <a href="#architecture">Architecture</a>
-    <a href="#clinical">Morphology Reference</a>
-    <a href="#quickstart">Quickstart</a>
-    <a class="repo" href="https://github.com/abusuraihsakhri/blast-detection-algo">GitHub Repository</a>
-    <button id="theme" type="button" aria-label="Toggle color theme">◐</button>
-  </nav>
-</header>
+  <!-- NAVIGATION HEADER -->
+  <header class="nav-header">
+    <div class="nav-container">
+      <a class="brand-logo" href="./">
+        <div class="logo-badge">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="4"></circle>
+            <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line>
+            <line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line>
+            <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line>
+            <line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line>
+          </svg>
+        </div>
+        <span>Blast Detection</span>
+        <span class="brand-version">v1.0.0</span>
+      </a>
 
-<main>
-<!-- HERO SECTION -->
-<section class="hero">
-  <div>
-    <p class="eyebrow">COMPUTER VISION RESEARCH · HEMATOPATHOLOGY · ACTIVE LEARNING</p>
-    <h1>Detection and classification of <em>Leukemic Blasts.</em></h1>
-    <p class="lede">A PyTorch and YOLOv8n pipeline trained on <strong>25,875 microscopy fields</strong> with <strong>115,548 expert-annotated cells</strong> across 6 research cohorts. Slices Whole Slide Images (WSIs) into overlapping tiles, predicts candidate cell bounding boxes across a 10-class taxonomy (B-ALL stages: Early, Pre, Pro; AML Myeloblast; normal leukocytes and erythrocytes), and provides an active learning replay buffer for ongoing refinement.</p>
-    
-    <div class="actions">
-      <a class="primary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0">Download Weights (v1.0.0)</a>
-      <a class="secondary" href="https://github.com/abusuraihsakhri/blast-detection-algo">View Repository</a>
-      <a class="secondary" href="#results">Validation Metrics ↓</a>
-    </div>
-  </div>
+      <nav class="nav-links" aria-label="Primary Navigation">
+        <a class="nav-link" href="#results">Validation Results</a>
+        <a class="nav-link" href="#visualizer">Curve Visualizer</a>
+        <a class="nav-link" href="#datalake">Datalake</a>
+        <a class="nav-link" href="#taxonomy">Taxonomy</a>
+        <a class="nav-link" href="#architecture">Architecture</a>
+        <a class="nav-link" href="#quickstart">Quickstart</a>
+      </nav>
 
-  <aside class="status-card" aria-label="Model Specifications">
-    <div class="status-head">
-      <span class="brand-dot"></span>
-      Model & Dataset Summary
-    </div>
-    <dl>
-      <div><dt>Datalake Scale</dt><dd>25,875 Fields / Images</dd></div>
-      <div><dt>Annotated Cells</dt><dd>115,548 Bounding Boxes</dd></div>
-      <div><dt>Peak mAP@50</dt><dd>92.23% (0.9223)</dd></div>
-      <div><dt>Precision ($P$)</dt><dd>88.40% (0.8840)</dd></div>
-      <div><dt>Recall ($R$)</dt><dd>89.93% (0.8993)</dd></div>
-      <div><dt>mAP@50-95</dt><dd>71.86% (0.7186)</dd></div>
-      <div><dt>Parameters</dt><dd>3.01 Million (YOLOv8n)</dd></div>
-      <div><dt>Inference Latency</dt><dd>1.2 – 2.8 ms / tile</dd></div>
-      <div><dt>Active Learning</dt><dd>Experience Replay Buffer</dd></div>
-      <div><dt>WSI Inference</dt><dd>Sliding Window + Global NMS</dd></div>
-    </dl>
-  </aside>
-</section>
+      <div class="nav-actions">
+        <button id="theme" class="theme-toggle-btn" type="button" aria-label="Toggle color theme" title="Toggle theme">
+          <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
 
-<!-- EMPIRICAL VALIDATION RESULTS -->
-<section id="results" class="section">
-  <p class="eyebrow">EXPERIMENTAL BENCHMARKS</p>
-  <h2>20-Epoch Training Convergence & Evaluation</h2>
-  <p class="lede">The baseline detector was trained on the aggregated 6-cohort dataset and evaluated on holdout validation splits. Convergence peaked at epoch 10 with <strong>92.23% mAP@50</strong>.</p>
+        <a class="btn-github" href="https://github.com/abusuraihsakhri/blast-detection-algo" target="_blank" rel="noopener noreferrer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          <span>Repository</span>
+        </a>
+      </div>
+    </div>
+  </header>
 
-  <div class="metric-grid">
-    <div class="metric-box">
-      <div class="metric-value">92.23%</div>
-      <div class="metric-label">mAP@50</div>
-      <div class="metric-detail">Detection sensitivity at 0.50 IoU</div>
-    </div>
-    <div class="metric-box">
-      <div class="metric-value">88.40%</div>
-      <div class="metric-label">Precision ($P$)</div>
-      <div class="metric-detail">Precision across cell categories</div>
-    </div>
-    <div class="metric-box">
-      <div class="metric-value">89.93%</div>
-      <div class="metric-label">Recall ($R$)</div>
-      <div class="metric-detail">Recall across annotated cell boundaries</div>
-    </div>
-    <div class="metric-box">
-      <div class="metric-value">71.86%</div>
-      <div class="metric-label">mAP@50-95</div>
-      <div class="metric-detail">Localization accuracy across IoU 0.50–0.95</div>
-    </div>
-    <div class="metric-box">
-      <div class="metric-value">&lt; 2.5 ms</div>
-      <div class="metric-label">Tile Forward Pass</div>
-      <div class="metric-detail">CUDA inference throughput</div>
-    </div>
-  </div>
+  <!-- HERO SECTION -->
+  <section class="hero-section">
+    <div class="hero-grid">
+      <div>
+        <div class="pill-announcement">
+          <span class="pulse-dot"></span>
+          <span>WEIGHTS COMMITTED & RELEASED · v1.0.0</span>
+        </div>
+        <h1 class="hero-title">Empirical detection and classification of <em>Leukemic Blasts.</em></h1>
+        <p class="hero-lede">A PyTorch and YOLOv8n pipeline trained on <strong>25,875 microscopy fields</strong> with <strong>115,548 expert-annotated cells</strong> across 6 research cohorts. Features automated whole slide image (WSI) sliding-window tiling, multi-class blast morphology classification, and experience replay active learning.</p>
+        
+        <div class="hero-actions">
+          <a class="btn-primary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download Weights (v1.0.0)</span>
+          </a>
+          <a class="btn-secondary" href="#visualizer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            <span>Explore Validation Curves</span>
+          </a>
+          <a class="btn-secondary" href="#quickstart">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 17 10 11 4 5"></polyline>
+              <line x1="12" y1="19" x2="20" y2="19"></line>
+            </svg>
+            <span>Quickstart Code</span>
+          </a>
+        </div>
+      </div>
 
-  <div class="gallery-grid">
-    <div class="gallery-card">
-      <img src="assets/results.png" alt="Training Convergence Curves" loading="lazy">
-      <div class="gallery-card-body">
-        <h4>Loss Convergence & Validation Trajectory</h4>
-        <p>Box loss, class loss, DFL loss, and precision/recall metrics over 20 training epochs.</p>
+      <aside class="hud-card" aria-label="Model Specifications HUD">
+        <div class="hud-header">
+          <div class="hud-status">
+            <span class="live-indicator"></span>
+            <span>Active Checkpoint: active_model.pt</span>
+          </div>
+          <span class="hud-tag">YOLOv8n</span>
+        </div>
+
+        <div class="hud-grid">
+          <div class="hud-item">
+            <div class="hud-label">Peak mAP@50</div>
+            <div class="hud-value highlight">92.23%</div>
+          </div>
+          <div class="hud-item">
+            <div class="hud-label">mAP@50-95</div>
+            <div class="hud-value highlight">71.86%</div>
+          </div>
+          <div class="hud-item">
+            <div class="hud-label">Precision (P)</div>
+            <div class="hud-value">88.40%</div>
+          </div>
+          <div class="hud-item">
+            <div class="hud-label">Recall (R)</div>
+            <div class="hud-value">89.93%</div>
+          </div>
+          <div class="hud-item">
+            <div class="hud-label">Datalake Scale</div>
+            <div class="hud-value">25,875 Fields</div>
+          </div>
+          <div class="hud-item">
+            <div class="hud-label">Annotated Cells</div>
+            <div class="hud-value">115,548 Boxes</div>
+          </div>
+          <div class="hud-item">
+            <div class="hud-label">Checkpoint Size</div>
+            <div class="hud-value">6.25 MB</div>
+          </div>
+          <div class="hud-item">
+            <div class="hud-label">Inference Latency</div>
+            <div class="hud-value">1.2 – 2.8 ms</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- SECTION: EMPIRICAL BENCHMARKS -->
+  <section id="results" class="section-container">
+    <div class="section-header">
+      <div class="section-eyebrow">TRAINING DYNAMICS & VALIDATION CONVERGENCE</div>
+      <h2 class="section-title">Rigorous Empirical Benchmarks Across 20 Epochs</h2>
+      <p class="section-lede">The baseline detector was trained on an aggregated 6-cohort datalake and evaluated on unseen holdout validation splits under strict IoU metrics. Convergence peaked at epoch 10 with <strong>92.23% mAP@50</strong>.</p>
+    </div>
+
+    <div class="metric-strip">
+      <div class="metric-card">
+        <div class="metric-stat">92.23%</div>
+        <div class="metric-name">mAP@50</div>
+        <div class="metric-caption">Peak detection sensitivity at standard IoU 0.50 threshold across all classes.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-stat">88.40%</div>
+        <div class="metric-name">Precision (P)</div>
+        <div class="metric-caption">Accuracy of positive blast predictions, minimizing spurious cellular false-positives.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-stat">89.93%</div>
+        <div class="metric-name">Recall (R)</div>
+        <div class="metric-caption">Comprehensive capture of blast boundaries to avoid missing neoplastic cells.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-stat">71.86%</div>
+        <div class="metric-name">mAP@50-95</div>
+        <div class="metric-caption">Localization precision computed across multiple stringent IoU thresholds (0.50 to 0.95).</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-stat">&lt; 2.5 ms</div>
+        <div class="metric-name">Tile Latency</div>
+        <div class="metric-caption">Average forward-pass latency per 512×512 tile under CUDA acceleration.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION: INTERACTIVE TABBED VISUALIZER -->
+  <section id="visualizer" class="section-container">
+    <div class="section-header">
+      <div class="section-eyebrow">EMPIRICAL ARTIFACT VIEWER</div>
+      <h2 class="section-title">Interactive Validation Curves & Detection Batches</h2>
+      <p class="section-lede">Inspect convergence loss curves, normalized confusion matrices, precision-recall trade-offs, and side-by-side ground truth vs predictions. Click any artifact to enlarge in high resolution.</p>
+    </div>
+
+    <div class="tabs-wrapper">
+      <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="convergence" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>Loss Convergence & Trajectory</span>
+        </button>
+        <button class="tab-btn" data-tab="confusion" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>Confusion Matrices</span>
+        </button>
+        <button class="tab-btn" data-tab="curves" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3v18h18"></path>
+            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
+          </svg>
+          <span>PR & F1 Calibration</span>
+        </button>
+        <button class="tab-btn" data-tab="batches" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <span>Validation Batches (Side-by-Side)</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: LOSS CONVERGENCE -->
+      <div id="tab-convergence" class="tab-pane active">
+        <div class="visual-grid">
+          <div class="figure-card">
+            <img src="assets/results.png" alt="Training Convergence Curves" loading="lazy">
+            <div class="figure-caption">
+              <h4>Training & Validation Trajectory Across 20 Epochs</h4>
+              <p>Tracking box loss, classification loss, distribution focal loss (DFL), and mAP metrics. Convergence was attained at epoch 10 with 92.23% mAP@50 and minimal validation loss.</p>
+            </div>
+          </div>
+
+          <div class="figure-card">
+            <img src="assets/labels.jpg" alt="Label Distribution and Spatial Coordinates" loading="lazy">
+            <div class="figure-caption">
+              <h4>Class Frequency & Spatial Bounding Box Distribution</h4>
+              <p>Correlation between bounding box sizes, coordinate centroids, and aspect ratios across the annotated 115,548 cellular instances in the aggregate training set.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: CONFUSION MATRIX -->
+      <div id="tab-confusion" class="tab-pane">
+        <div class="visual-grid">
+          <div class="figure-card">
+            <img src="assets/confusion_matrix_normalized.png" alt="Normalized Confusion Matrix" loading="lazy">
+            <div class="figure-caption">
+              <h4>Normalized Confusion Matrix</h4>
+              <p>Quantifies cross-class classification fidelity. Highlights distinct separation between precursor lymphoid stages (Early vs Pre vs Pro) and baseline blood cells.</p>
+            </div>
+          </div>
+
+          <div class="figure-card">
+            <img src="assets/confusion_matrix.png" alt="Raw Confusion Matrix" loading="lazy">
+            <div class="figure-caption">
+              <h4>Raw Instance Count Confusion Matrix</h4>
+              <p>Raw frequency counts showing true labels vs predicted cellular classes on holdout validation tiles.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: PR & F1 CURVES -->
+      <div id="tab-curves" class="tab-pane">
+        <div class="visual-grid">
+          <div class="figure-card">
+            <img src="assets/BoxPR_curve.png" alt="Precision-Recall Curve" loading="lazy">
+            <div class="figure-caption">
+              <h4>Precision-Recall (PR) Curve</h4>
+              <p>Area under the PR curve across all 10 unified classes. Demonstrates sustained precision across varying recall operating regimes at IoU 0.50.</p>
+            </div>
+          </div>
+
+          <div class="figure-card">
+            <img src="assets/BoxF1_curve.png" alt="F1 Score vs Confidence Calibration" loading="lazy">
+            <div class="figure-caption">
+              <h4>F1 Score vs Confidence Threshold Calibration</h4>
+              <p>Identifies optimal operating threshold for production inference. The global F1 score peaks at 0.89 under confidence 0.54.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: VALIDATION BATCHES -->
+      <div id="tab-batches" class="tab-pane">
+        <div class="batch-selector">
+          <span style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-right: 6px;">Select Cohort Tile:</span>
+          <button class="batch-btn active" data-batch="0" type="button">Batch 0 (Heterogeneous Fields)</button>
+          <button class="batch-btn" data-batch="1" type="button">Batch 1 (Dense High-Cellularity)</button>
+          <button class="batch-btn" data-batch="2" type="button">Batch 2 (Complex Clustered Fields)</button>
+        </div>
+
+        <div class="visual-grid">
+          <div class="figure-card">
+            <img id="batch-labels-img" src="assets/val_batch0_labels.jpg" alt="Ground Truth Annotations" loading="lazy">
+            <div class="figure-caption">
+              <h4 id="batch-labels-title">Validation Batch 0 — Annotated Ground Truth</h4>
+              <p>Expert reference labels indicating true blast subtype boundaries and standard blood lineage elements.</p>
+            </div>
+          </div>
+
+          <div class="figure-card">
+            <img id="batch-preds-img" src="assets/val_batch0_pred.jpg" alt="Model Predictions" loading="lazy">
+            <div class="figure-caption">
+              <h4 id="batch-preds-title">Validation Batch 0 — YOLOv8n Predictions</h4>
+              <p>Autonomous detector predictions on the identical validation field, showing bounding boxes and confidence scores.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION: DATASET OVERVIEW -->
+  <section id="datalake" class="section-container">
+    <div class="section-header">
+      <div class="section-eyebrow">DATALAKE HARMONIZATION</div>
+      <h2 class="section-title">Aggregated Multi-Cohort Datalake (25,875 Fields)</h2>
+      <p class="section-lede">Six independent hematopathology research cohorts were aggregated and mapped into a single unified 10-class taxonomy comprising 115,548 bounding-box annotations.</p>
+    </div>
+
+    <div class="table-card">
+      <div class="data-table-wrapper">
+        <table class="clean-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cohort / Dataset Source</th>
+              <th>Target Morphological Scope</th>
+              <th>Train</th>
+              <th>Valid</th>
+              <th>Test</th>
+              <th>Total Images</th>
+              <th>Annotated Cells</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>1</strong></td>
+              <td><strong>Leukemia-NFXZN</strong> (Tawfiq Islam)</td>
+              <td>B-ALL subtyping (Benign, Early, Pre, Pro)</td>
+              <td>6,589</td>
+              <td>622</td>
+              <td>312</td>
+              <td><span class="source-badge">7,523</span></td>
+              <td><strong>83,854</strong></td>
+            </tr>
+            <tr>
+              <td><strong>2</strong></td>
+              <td><strong>Blast-Cell-Detection</strong> (YOLOv4)</td>
+              <td>Binary blast vs normal leukocyte differentiation</td>
+              <td>3,011</td>
+              <td>72</td>
+              <td>39</td>
+              <td><span class="source-badge">3,122</span></td>
+              <td><strong>3,365</strong></td>
+            </tr>
+            <tr>
+              <td><strong>3</strong></td>
+              <td><strong>BCCD Blood Cell Foundation</strong></td>
+              <td>Baseline blood elements (WBC, RBC, Platelets)</td>
+              <td>377</td>
+              <td>110</td>
+              <td>53</td>
+              <td><span class="source-badge">540</span></td>
+              <td><strong>8,851</strong></td>
+            </tr>
+            <tr>
+              <td><strong>4</strong></td>
+              <td><strong>Blood-Cell-znm2t Differential</strong></td>
+              <td>Leukocyte differential (12 mature subtypes)</td>
+              <td>9,105</td>
+              <td>389</td>
+              <td>387</td>
+              <td><span class="source-badge">9,881</span></td>
+              <td><strong>10,589</strong></td>
+            </tr>
+            <tr>
+              <td><strong>5</strong></td>
+              <td><strong>Acute-Leukemia AML/ALL</strong></td>
+              <td>Myeloblast vs Lymphoblast differentiation</td>
+              <td>3,809</td>
+              <td>0</td>
+              <td>0</td>
+              <td><span class="source-badge">3,809</span></td>
+              <td><strong>7,626</strong></td>
+            </tr>
+            <tr>
+              <td><strong>6</strong></td>
+              <td><strong>Myeloblast-fbliw Dedicated</strong></td>
+              <td>Acute myeloid leukemia (AML) blast morphology</td>
+              <td>700</td>
+              <td>200</td>
+              <td>100</td>
+              <td><span class="source-badge">1,000</span></td>
+              <td><strong>1,263</strong></td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3"><strong>Total Aggregated Datalake</strong></td>
+              <td><strong>23,591</strong></td>
+              <td><strong>1,393</strong></td>
+              <td><strong>891</strong></td>
+              <td><strong>25,875</strong></td>
+              <td><strong>115,548</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION: TAXONOMY -->
+  <section id="taxonomy" class="section-container">
+    <div class="section-header">
+      <div class="section-eyebrow">MORPHOLOGY TAXONOMY</div>
+      <h2 class="section-title">Unified 10-Class Cellular Taxonomy</h2>
+      <p class="section-lede">The model evaluates cellular characteristics including nucleocytoplasmic (N:C) ratio, chromatin condensation, cytoplasmic basophilia, and nuclear contour clefting.</p>
+    </div>
+
+    <div class="taxonomy-grid">
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">Pre B-ALL</div>
+          <div class="tax-count">46,491 cells</div>
+        </div>
+        <p class="tax-desc">Intermediate lymphoid blast stage. Exhibiting condensed chromatin, irregular nuclear contours, and minimal to moderate basophilic cytoplasm.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">Early Pre-B</div>
+          <div class="tax-count">16,402 cells</div>
+        </div>
+        <p class="tax-desc">Precursor B-lymphoblastic stage with high N:C ratio, dense homogeneous chromatin texture, and absent or inconspicuous nucleoli.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">Pro B-ALL</div>
+          <div class="tax-count">10,818 cells</div>
+        </div>
+        <p class="tax-desc">Early uncommitted B-cell lineage blast (CD10-). Lacks mature B-cell surface markers; features round-to-oval nuclei with delicate chromatin.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">Myeloblast (AML)</div>
+          <div class="tax-count">3,003 cells</div>
+        </div>
+        <p class="tax-desc">Myeloid precursor blast indicative of AML. Characterized by prominent nucleoli, moderate cytoplasm, dispersed chromatin, and occasional Auer rods.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">Lymphoblast</div>
+          <div class="tax-count">4,215 cells</div>
+        </div>
+        <p class="tax-desc">Generic immature lymphoid blast cells captured across cross-institutional acute leukemia datasets with variable staining artifacts.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">Benign</div>
+          <div class="tax-count">14,280 cells</div>
+        </div>
+        <p class="tax-desc">Normal mature lymphocytes, monocytes, and mature granulocytes serving as negative controls to prevent false blast alarms.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">WBC</div>
+          <div class="tax-count">10,589 cells</div>
+        </div>
+        <p class="tax-desc">Standard mature white blood cells from BCCD and differential cohorts: neutrophils, eosinophils, and basophils.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">RBC</div>
+          <div class="tax-count">6,842 cells</div>
+        </div>
+        <p class="tax-desc">Biconcave anucleated mature erythrocytes used for background normalization, field density assessment, and scale calibration.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">Platelets</div>
+          <div class="tax-count">2,009 cells</div>
+        </div>
+        <p class="tax-desc">Small thrombocyte fragments; crucial for resolving smear debris and preventing false positive small-blast classifications.</p>
+      </div>
+
+      <div class="tax-card">
+        <div class="tax-header">
+          <div class="tax-name">Atypical</div>
+          <div class="tax-count">899 cells</div>
+        </div>
+        <p class="tax-desc">Reactive, apoptotic, or unclassified atypical mononuclear cells flagged for human-in-the-loop expert review.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION: SYSTEM ARCHITECTURE -->
+  <section id="architecture" class="section-container">
+    <div class="section-header">
+      <div class="section-eyebrow">SYSTEM ARCHITECTURE</div>
+      <h2 class="section-title">WSI Sliding-Window & Active Learning Loop</h2>
+      <p class="section-lede">Engineered for gigapixel digital pathology slide ingestion and human-in-the-loop experience replay fine-tuning without catastrophic forgetting.</p>
+    </div>
+
+    <div class="flow-container">
+      <div class="flow-step">
+        <div class="step-num">Step 01</div>
+        <div class="step-title">WSI Ingestion</div>
+        <div class="step-desc">Extracts multi-resolution pyramid levels (.svs, .ndpi, .tiff) using tiffslide.</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-num">Step 02</div>
+        <div class="step-title">Glass Filtering</div>
+        <div class="step-desc">Evaluates RGB luminance; automatically discards >80% empty slide glass areas.</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-num">Step 03</div>
+        <div class="step-title">512×512 Tiling</div>
+        <div class="step-desc">Sliding window with 25% overlap to ensure boundary cells are fully captured.</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-num">Step 04</div>
+        <div class="step-title">YOLOv8n Inference</div>
+        <div class="step-desc">CUDA-accelerated 3.01M parameter forward pass with sub-2.5ms latency per patch.</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-num">Step 05</div>
+        <div class="step-title">Global NMS</div>
+        <div class="step-desc">Re-projects local tile coordinates to slide space and eliminates edge duplicates (IoU 0.45).</div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-num">Step 06</div>
+        <div class="step-title">Experience Replay</div>
+        <div class="step-desc">Maintains 4:1 historical-to-new ratio with 1.5× quota boost for rare classes.</div>
       </div>
     </div>
 
-    <div class="gallery-card">
-      <img src="assets/confusion_matrix_normalized.png" alt="Normalized Confusion Matrix" loading="lazy">
-      <div class="gallery-card-body">
-        <h4>Normalized Confusion Matrix</h4>
-        <p>Inter-class distribution showing separation among Benign, Pre-B ALL stages, and normal WBCs.</p>
+    <div class="modules-grid">
+      <div class="module-card">
+        <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">wsi_tiler.py</div>
+        <h3>Gigapixel Sliding-Window Engine</h3>
+        <p>Efficiently navigates multi-gigabyte digital whole slide images. Computes cellular density masks, extracts 512×512 patches with stride overlap, and projects tile detections back to slide coordinates.</p>
+      </div>
+
+      <div class="module-card">
+        <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">replay_buffer.py</div>
+        <h3>Stratified Experience Replay</h3>
+        <p>Mitigates catastrophic forgetting when pathologists correct or add annotations. Dynamically constructs balanced training subsets by oversampling underrepresented classes (e.g. Myeloblast and Atypical).</p>
+      </div>
+
+      <div class="module-card">
+        <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">app.py & review_ui</div>
+        <h3>Human-in-the-Loop Web Sandbox</h3>
+        <p>FastAPI-powered review interface. Features real-time confidence tuning, bounding-box editing, security-hardened file uploads (OWASP Top 10), and direct triggers for incremental fine-tuning.</p>
       </div>
     </div>
+  </section>
 
-    <div class="gallery-card">
-      <img src="assets/BoxPR_curve.png" alt="Precision-Recall Curve" loading="lazy">
-      <div class="gallery-card-body">
-        <h4>Precision-Recall (PR) Curve</h4>
-        <p>Precision-recall curves across all 10 unified dataset classes.</p>
+  <!-- SECTION: QUICKSTART & CODE -->
+  <section id="quickstart" class="section-container">
+    <div class="section-header">
+      <div class="section-eyebrow">DEVELOPER INTEGRATION</div>
+      <h2 class="section-title">Quickstart & Pipeline Execution</h2>
+      <p class="section-lede">The weights are included in the repository at <code>data/models/active_model.pt</code> and can be loaded directly with standard Ultralytics YOLO or via the integrated pipeline scripts.</p>
+    </div>
+
+    <div class="code-container">
+      <div class="code-header">
+        <div class="code-tabs">
+          <button class="code-tab-btn active" data-code="quickstart" type="button">1. Setup & Installation</button>
+          <button class="code-tab-btn" data-code="python" type="button">2. PyTorch / YOLO Inference</button>
+          <button class="code-tab-btn" data-code="wsi" type="button">3. Whole Slide Inference</button>
+          <button class="code-tab-btn" data-code="review" type="button">4. Review Server</button>
+        </div>
+        <button id="copy-btn" class="copy-btn" type="button" title="Copy active code snippet">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="copy-text">Copy Code</span>
+        </button>
       </div>
-    </div>
 
-    <div class="gallery-card">
-      <img src="assets/BoxF1_curve.png" alt="F1-Confidence Calibration Curve" loading="lazy">
-      <div class="gallery-card-body">
-        <h4>F1-Confidence Calibration Curve</h4>
-        <p>F1 score response across confidence thresholds.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- VISUAL DETECTION GALLERY -->
-<section id="visuals" class="section">
-  <p class="eyebrow">VALIDATION EXAMPLES</p>
-  <h2>Microscopic Validation Batches</h2>
-  <p class="lede">Ground-truth labels compared with model predictions on unseen validation tiles. Click any image to view in fullscreen.</p>
-
-  <div class="gallery-grid">
-    <div class="gallery-card">
-      <img src="assets/val_batch0_labels.jpg" alt="Validation Batch 0 Ground Truth" loading="lazy">
-      <div class="gallery-card-body">
-        <h4>Validation Batch 0 — Annotated Ground Truth</h4>
-        <p>Ground-truth bounding boxes designating blast subtypes and normal blood elements.</p>
-      </div>
-    </div>
-
-    <div class="gallery-card">
-      <img src="assets/val_batch0_pred.jpg" alt="Validation Batch 0 Predictions" loading="lazy">
-      <div class="gallery-card-body">
-        <h4>Validation Batch 0 — Model Predictions</h4>
-        <p>YOLOv8n bounding boxes and classification outputs on the same validation fields.</p>
-      </div>
-    </div>
-
-    <div class="gallery-card">
-      <img src="assets/val_batch1_labels.jpg" alt="Validation Batch 1 Ground Truth" loading="lazy">
-      <div class="gallery-card-body">
-        <h4>Validation Batch 1 — Annotated Ground Truth</h4>
-        <p>Dense smear fields with adjacent erythrocytes and leukocytes.</p>
-      </div>
-    </div>
-
-    <div class="gallery-card">
-      <img src="assets/val_batch1_pred.jpg" alt="Validation Batch 1 Predictions" loading="lazy">
-      <div class="gallery-card-body">
-        <h4>Validation Batch 1 — Model Predictions</h4>
-        <p>Model predictions across varying staining intensities and cell clustering.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- DATASET OVERVIEW -->
-<section id="datalake" class="section">
-  <p class="eyebrow">DATASET AGGREGATION</p>
-  <h2>Multi-Source Dataset Summary (25,875 Images)</h2>
-  <p class="lede">Six public research datasets were mapped into a unified 10-class taxonomy covering lymphoid neoplasms, myeloid neoplasms, and baseline blood elements.</p>
-
-  <div class="data-table-container">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Dataset / Cohort</th>
-          <th>Target Subsets</th>
-          <th>Train</th>
-          <th>Valid</th>
-          <th>Test</th>
-          <th>Total Images</th>
-          <th>Annotated Cells</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>1</strong></td>
-          <td><strong>Leukemia-NFXZN</strong> (Tawfiq Islam)</td>
-          <td>B-ALL subtyping (Benign, Early, Pre, Pro)</td>
-          <td>6,589</td>
-          <td>622</td>
-          <td>312</td>
-          <td><strong>7,523</strong></td>
-          <td>83,854</td>
-        </tr>
-        <tr>
-          <td><strong>2</strong></td>
-          <td><strong>Blast-Cell-Detection</strong> (YOLOv4)</td>
-          <td>Binary blast vs normal leukocyte differentiation</td>
-          <td>3,011</td>
-          <td>72</td>
-          <td>39</td>
-          <td><strong>3,122</strong></td>
-          <td>3,365</td>
-        </tr>
-        <tr>
-          <td><strong>3</strong></td>
-          <td><strong>BCCD Blood Cell Foundation</strong></td>
-          <td>Baseline elements (WBC, RBC, Platelets)</td>
-          <td>377</td>
-          <td>110</td>
-          <td>53</td>
-          <td><strong>540</strong></td>
-          <td>8,851</td>
-        </tr>
-        <tr>
-          <td><strong>4</strong></td>
-          <td><strong>Blood-Cell-znm2t Differential</strong></td>
-          <td>Leukocyte differential (12 subtypes)</td>
-          <td>9,105</td>
-          <td>389</td>
-          <td>387</td>
-          <td><strong>9,881</strong></td>
-          <td>10,589</td>
-        </tr>
-        <tr>
-          <td><strong>5</strong></td>
-          <td><strong>Acute-Leukemia AML/ALL</strong></td>
-          <td>Myeloblast vs Lymphoblast differentiation</td>
-          <td>3,809</td>
-          <td>0</td>
-          <td>0</td>
-          <td><strong>3,809</strong></td>
-          <td>7,626</td>
-        </tr>
-        <tr>
-          <td><strong>6</strong></td>
-          <td><strong>Myeloblast-fbliw Dedicated</strong></td>
-          <td>Acute myeloid leukemia (AML) blasts</td>
-          <td>700</td>
-          <td>200</td>
-          <td>100</td>
-          <td><strong>1,000</strong></td>
-          <td>1,263</td>
-        </tr>
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3"><strong>Total Dataset Size</strong></td>
-          <td><strong>23,591</strong></td>
-          <td><strong>1,393</strong></td>
-          <td><strong>891</strong></td>
-          <td><strong>25,875</strong></td>
-          <td><strong>115,548</strong></td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
-
-  <div class="grid-3">
-    <div class="card">
-      <b>Class Distribution</b>
-      <h3>Pre B-ALL Blasts</h3>
-      <p><strong>46,491 instances.</strong> Intermediate lymphoid blasts exhibiting condensed chromatin and high N:C ratio.</p>
-    </div>
-    <div class="card">
-      <b>Class Distribution</b>
-      <h3>Early & Pro B-ALL</h3>
-      <p><strong>27,220 instances</strong> (16,402 Early + 10,818 Pro). Early precursor and late committed lymphoid blast stages.</p>
-    </div>
-    <div class="card">
-      <b>Class Distribution</b>
-      <h3>Myeloblast (AML)</h3>
-      <p><strong>3,003 instances.</strong> Myeloid leukemic blasts characterized by moderate basophilic cytoplasm and fine chromatin.</p>
-    </div>
-  </div>
-</section>
-
-<!-- SYSTEM ARCHITECTURE -->
-<section id="architecture" class="section">
-  <p class="eyebrow">SYSTEM ARCHITECTURE</p>
-  <h2>WSI Tiling and Active Learning Pipeline</h2>
-  <p class="lede">Sliding-window tile processing integrated with an experience replay buffer to mitigate catastrophic forgetting during incremental fine-tuning.</p>
-
-  <div class="architecture-flow">
-    <div class="arch-node">
-      <span>Input Source</span>
-      <strong>Whole Slide Image</strong>
-      <p>.svs / .ndpi / .tiff pyramid files</p>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-node">
-      <span>Tiling Engine</span>
-      <strong>Sliding Window</strong>
-      <p>512×512 tiles with 25% overlap & glass filtering</p>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-node">
-      <span>Neural Core</span>
-      <strong>YOLOv8n Backbone</strong>
-      <p>3.01M parameter forward pass</p>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-node">
-      <span>Suppression</span>
-      <strong>Global NMS</strong>
-      <p>Re-projects local boxes and collapses overlaps</p>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-node">
-      <span>Active Learning</span>
-      <strong>Replay Buffer</strong>
-      <p>Stratified historical sampling with 1.5× boost</p>
-    </div>
-  </div>
-
-  <div class="grid-3">
-    <div class="card">
-      <b>Modules 1 & 2</b>
-      <h3>Sliding-Window WSI Inference</h3>
-      <p>Extracts overlapping patches using <code>tiffslide</code>, filters background glass (>80% bright threshold), maps tile coordinates to slide-level space, and applies global Non-Maximum Suppression (IoU = 0.45).</p>
-    </div>
-    <div class="card">
-      <b>Module 3</b>
-      <h3>Experience Replay Buffer</h3>
-      <p>Prevents catastrophic forgetting during review cycles by sampling a 4:1 historical-to-new image ratio, stratified across all 10 taxonomy classes, with a 1.5× quota multiplier for underrepresented classes.</p>
-    </div>
-    <div class="card">
-      <b>Modules 4 & 5</b>
-      <h3>Sandbox Inference & Review UI</h3>
-      <p>FastAPI browser interface for testing local images, dynamically tuning confidence thresholds, modifying bounding boxes, and saving corrections for subsequent training cycles.</p>
-    </div>
-  </div>
-</section>
-
-<!-- MORPHOLOGY REFERENCE -->
-<section id="clinical" class="section">
-  <p class="eyebrow">MORPHOLOGY REFERENCE</p>
-  <h2>FAB & WHO 2022 Morphological Correlates</h2>
-  <p class="lede">Overview of morphological features associated with the 10 categories in the dataset taxonomy.</p>
-
-  <div class="data-table-container">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Category</th>
-          <th>Classification Correlate</th>
-          <th>Cytological Characteristics</th>
-          <th>Morphological Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><span class="tag">Early Pre-B</span></td>
-          <td>Pre-B Acute Lymphoblastic Leukemia</td>
-          <td>Small-to-medium blasts, high N:C ratio, dense chromatin, inconspicuous nucleoli</td>
-          <td>Precursor B-cell blast morphology</td>
-        </tr>
-        <tr>
-          <td><span class="tag">Pre B-ALL</span></td>
-          <td>B-Lymphoblastic Leukemia / Lymphoma</td>
-          <td>Heterogeneous size, clefted/irregular nuclear contours, variable cytoplasm</td>
-          <td>Intermediate stage in precursor B-lymphoblastic progression</td>
-        </tr>
-        <tr>
-          <td><span class="tag">Pro B-ALL</span></td>
-          <td>Pro-B (CD10-) Precursor B-ALL</td>
-          <td>Immature lymphoid morphology lacking mature lineage markers</td>
-          <td>Early uncommitted stage in B-cell blast differentiation</td>
-        </tr>
-        <tr>
-          <td><span class="tag tag-warning">Myeloblast</span></td>
-          <td>Acute Myeloid Leukemia (AML)</td>
-          <td>Large blasts, delicate chromatin, visible nucleoli, variable cytoplasmic basophilia</td>
-          <td>Distinguished from lymphoid blasts by chromatin texture and Auer rods when present</td>
-        </tr>
-        <tr>
-          <td><span class="tag tag-success">Benign / WBC</span></td>
-          <td>Normal Hematopoietic Lineage</td>
-          <td>Segmented neutrophils, mature lymphocytes, band forms, normoblasts</td>
-          <td>Baseline non-neoplastic controls for measuring false positive rate</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<!-- QUICKSTART -->
-<section id="quickstart" class="section">
-  <p class="eyebrow">GETTING STARTED</p>
-  <h2>Local Setup & Usage</h2>
-  <p class="lede">Model weights are committed in the repository and available via GitHub Releases.</p>
-
-  <pre><code># 1. Clone repository
+      <div class="code-body">
+        <!-- CODE 1: QUICKSTART -->
+        <div id="code-quickstart" class="code-pane active">
+<pre><code># 1. Clone the repository
 git clone https://github.com/abusuraihsakhri/blast-detection-algo.git
 cd blast-detection-algo
 
-# 2. Setup virtual environment
+# 2. Create isolated virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
+
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 3. Model weights are pre-loaded at data/models/active_model.pt
-# Alternatively, download from GitHub Release v1.0.0:
-# curl -L -o data/models/active_model.pt https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/active_model.pt
+# 4. Check active model weights (pre-loaded in repository)
+# Located at data/models/active_model.pt (6.25 MB, YOLOv8n, 10 classes)
+ls -lh data/models/active_model.pt</code></pre>
+        </div>
 
-# 4. Launch the local review UI
+        <!-- CODE 2: PYTHON INFERENCE -->
+        <div id="code-python" class="code-pane">
+<pre><code>from ultralytics import YOLO
+import cv2
+
+# Load the trained model checkpoint
+model = YOLO("data/models/active_model.pt")
+
+# Run inference on a blood smear field
+results = model.predict(
+    source="path/to/smear_field.jpg",
+    conf=0.25,        # 25% confidence threshold
+    iou=0.45,         # NMS IoU threshold
+    imgsz=640,
+    device="cuda:0"   # or "cpu"
+)
+
+# Parse detected blast candidates
+for box in results[0].boxes:
+    cls_id = int(box.cls[0].item())
+    cls_name = model.names[cls_id]
+    confidence = float(box.conf[0].item())
+    xyxy = box.xyxy[0].tolist()
+    print(f"Detected {cls_name:<12} ({confidence:.2%}) at {xyxy}")</code></pre>
+        </div>
+
+        <!-- CODE 3: WSI INFERENCE -->
+        <div id="code-wsi" class="code-pane">
+<pre><code>from inference_pipeline import run_wsi_pipeline
+
+# Process a gigapixel whole slide image with sliding-window tiling
+summary = run_wsi_pipeline(
+    wsi_path="path/to/bone_marrow_biopsy.svs",
+    model_path="data/models/active_model.pt",
+    output_dir="data/wsi_results",
+    tile_size=512,
+    overlap_pct=0.25,
+    conf_threshold=0.25,
+    nms_iou_threshold=0.45
+)
+
+print(f"Total tiles evaluated: {summary['total_tiles']}")
+print(f"Blasts identified across slide: {summary['total_blasts']}")</code></pre>
+        </div>
+
+        <!-- CODE 4: REVIEW SERVER -->
+        <div id="code-review" class="code-pane">
+<pre><code># Launch the FastAPI human-in-the-loop review interface
 python app.py
-# Server starts at http://127.0.0.1:8000 with interactive review and sandbox modes
 
-# 5. Run sliding-window inference on a whole slide image
-python inference_pipeline.py /path/to/slide.svs</code></pre>
-</section>
-</main>
+# Review server starts at http://127.0.0.1:8000
+# Features:
+# - Drag-and-drop blood smear upload with OWASP-hardened validation
+# - Real-time confidence threshold slider
+# - Interactive bounding box editing & deletion
+# - Trigger experience replay training loop with 1 click</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
 
-<footer>
-  <div>
-    <strong>Blast Detection Pipeline</strong> · Maintained by <a href="https://github.com/abusuraihsakhri">abusuraihsakhri</a>
+  <!-- FOOTER -->
+  <footer class="page-footer">
+    <div class="footer-container">
+      <div>
+        <strong>Blast Detection Pipeline</strong> · Maintained by <a href="https://github.com/abusuraihsakhri" target="_blank" rel="noopener noreferrer">abusuraihsakhri</a>
+      </div>
+      <div class="footer-links">
+        <a class="footer-link" href="https://github.com/abusuraihsakhri/blast-detection-algo" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+        <a class="footer-link" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">Release v1.0.0</a>
+        <a class="footer-link" href="#results">Validation Metrics</a>
+      </div>
+    </div>
+    <div style="max-width: 1240px; margin: 12px auto 0; text-align: center; font-size: 11px; color: var(--text-subtle);">
+      For computational research and decision-support exploration only. Not certified as a standalone medical diagnostic device.
+    </div>
+  </footer>
+
+  <!-- LIGHTBOX MODAL -->
+  <div id="lightbox-modal" class="lightbox-modal" role="dialog" aria-modal="true" aria-label="Fullscreen image inspection">
+    <img id="lightbox-img" src="" alt="Enlarged validation figure">
   </div>
-  <div>
-    Research Use Only · Not a Validated Diagnostic Medical Device
-  </div>
-</footer>
 
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
