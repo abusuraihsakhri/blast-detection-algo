@@ -55,6 +55,10 @@ The server binds to `127.0.0.1:8000` by default and opens the local interface in
 
 The browser UI is a client for the local FastAPI backend. It is **not suitable for GitHub Pages**: functional inference and review require Python, SQLite, filesystem access, model weights, PyTorch/Ultralytics, and native WSI support. Converting this workflow to Pyodide/PyScript would not preserve the current functionality or practical model-loading characteristics.
 
+## Browser compatibility
+
+The interface uses standard Canvas and Pointer Events APIs and is intended for current Chromium, Firefox, and Safari releases on desktop and mobile. CI syntax-checks the JavaScript and smoke-tests the FastAPI routes; it does not currently run a cross-browser end-to-end test matrix.
+
 ## Main workflows
 
 ### WSI inference
