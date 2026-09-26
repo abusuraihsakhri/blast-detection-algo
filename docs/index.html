@@ -27,7 +27,7 @@
           </svg>
         </div>
         <span>Blast Detection</span>
-        <span class="brand-version">v1.0.0</span>
+        <span class="brand-version">v1.1.0</span>
       </a>
 
       <nav class="nav-links" aria-label="Primary Navigation">
@@ -71,7 +71,7 @@
       <div>
         <div class="pill-announcement">
           <span class="pulse-dot"></span>
-          <span>WEIGHTS COMMITTED & RELEASED · v1.0.0</span>
+          <span>WEIGHTS COMMITTED & RELEASED · v1.1.0</span>
         </div>
         <h1 class="hero-title">Empirical detection and classification of <em>Leukemic Blasts.</em></h1>
         <p class="hero-lede">A PyTorch and YOLOv8n pipeline trained on <strong>25,875 microscopy fields</strong> with <strong>115,548 annotated cells</strong> across 6 research cohorts. Features automated whole slide image (WSI) sliding-window tiling, multi-class blast morphology classification, and experience replay active learning.</p>
@@ -83,9 +83,9 @@
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span>Download Weights (v1.0.0)</span>
+            <span>Download Weights (v1.1.0)</span>
           </a>
-          <a class="btn-secondary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/best.pt" target="_blank" rel="noopener noreferrer">
+          <a class="btn-secondary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.1.0/best.pt" target="_blank" rel="noopener noreferrer">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -120,20 +120,20 @@
 
         <div class="hud-grid">
           <div class="hud-item">
-            <div class="hud-label">mAP@50 (val / test)</div>
-            <div class="hud-value highlight">92.2% / 91.0%</div>
+            <div class="hud-label">mAP@50 (leak-free test)</div>
+            <div class="hud-value highlight">96.94%</div>
           </div>
           <div class="hud-item">
             <div class="hud-label">mAP@50-95</div>
-            <div class="hud-value highlight">71.86%</div>
+            <div class="hud-value highlight">77.10%</div>
           </div>
           <div class="hud-item">
             <div class="hud-label">Precision (P)</div>
-            <div class="hud-value">88.40%</div>
+            <div class="hud-value">94.07%</div>
           </div>
           <div class="hud-item">
             <div class="hud-label">Recall (R)</div>
-            <div class="hud-value">89.93%</div>
+            <div class="hud-value">94.46%</div>
           </div>
           <div class="hud-item">
             <div class="hud-label">Datalake Scale</div>
@@ -145,7 +145,7 @@
           </div>
           <div class="hud-item">
             <div class="hud-label">Checkpoint Size</div>
-            <div class="hud-value">6.25 MB</div>
+            <div class="hud-value">6.27 MB</div>
           </div>
           <div class="hud-item">
             <div class="hud-label">Inference Latency</div>
@@ -160,8 +160,8 @@
   <section id="downloads" class="section-container">
     <div class="section-header">
       <div class="section-eyebrow">OFFICIAL MODEL CHECKPOINTS & ARTIFACTS</div>
-      <h2 class="section-title">Pretrained YOLOv8n Checkpoints (Release v1.0.0)</h2>
-      <p class="section-lede">Both raw training checkpoints and deployment inference weights are published as verifiable GitHub Release assets. Both files share the identical bitwise SHA-256 fingerprint generated at peak validation mAP@50 (92.23%).</p>
+      <h2 class="section-title">Pretrained YOLOv8n Checkpoints (Release v1.1.0)</h2>
+      <p class="section-lede">Both files are the same epoch-19 weights (identical SHA-256), published under two names. v1.0.0 remains available from its release page for comparison.</p>
     </div>
 
     <div class="release-cards-grid">
@@ -179,18 +179,18 @@
           </div>
           <div>
             <h3 class="release-filename">best.pt</h3>
-            <span class="release-filesize">6.25 MB (6,249,130 bytes) · PyTorch</span>
+            <span class="release-filesize">6.27 MB (6,270,162 bytes) · PyTorch</span>
           </div>
         </div>
-        <p class="release-card-desc">The top-performing weights saved during warm-start training at epoch 10. Standard filename for Ultralytics pipelines, research reproduction, and transfer learning.</p>
+        <p class="release-card-desc">The best validation epoch (19) of the v1.1.0 training run, with optimizer state stripped. Standard filename for Ultralytics pipelines, research reproduction, and transfer learning.</p>
         
         <div class="checksum-box">
           <div class="checksum-label">SHA-256 Checksum:</div>
-          <code class="checksum-value">c20dc36fcf15823b95ae967f24a27c6797c4d9649d1e48f949f5fb520de4df10</code>
+          <code class="checksum-value">ca4a0efaa5a85f7d60470c167b56b813e7e79749ec6bfc3fcabf6d814034e19d</code>
         </div>
 
         <div class="release-card-actions">
-          <a class="btn-primary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/best.pt" target="_blank" rel="noopener noreferrer">
+          <a class="btn-primary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.1.0/best.pt" target="_blank" rel="noopener noreferrer">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -198,7 +198,7 @@
             </svg>
             <span>Download best.pt</span>
           </a>
-          <a class="btn-github" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">
+          <a class="btn-github" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.1.0" target="_blank" rel="noopener noreferrer">
             <span>Release Notes</span>
           </a>
         </div>
@@ -218,18 +218,18 @@
           </div>
           <div>
             <h3 class="release-filename">active_model.pt</h3>
-            <span class="release-filesize">6.25 MB (6,249,130 bytes) · PyTorch</span>
+            <span class="release-filesize">6.27 MB (6,270,162 bytes) · PyTorch</span>
           </div>
         </div>
         <p class="release-card-desc">The deployment checkpoint bundled at <code>data/models/active_model.pt</code>, loaded by default by the FastAPI review sandbox and sliding-window WSI tiler.</p>
         
         <div class="checksum-box">
           <div class="checksum-label">SHA-256 Checksum:</div>
-          <code class="checksum-value">c20dc36fcf15823b95ae967f24a27c6797c4d9649d1e48f949f5fb520de4df10</code>
+          <code class="checksum-value">ca4a0efaa5a85f7d60470c167b56b813e7e79749ec6bfc3fcabf6d814034e19d</code>
         </div>
 
         <div class="release-card-actions">
-          <a class="btn-secondary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/active_model.pt" target="_blank" rel="noopener noreferrer">
+          <a class="btn-secondary" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.1.0/active_model.pt" target="_blank" rel="noopener noreferrer">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -237,7 +237,7 @@
             </svg>
             <span>Download active_model.pt</span>
           </a>
-          <a class="btn-github" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">
+          <a class="btn-github" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.1.0" target="_blank" rel="noopener noreferrer">
             <span>Release Notes</span>
           </a>
         </div>
@@ -257,13 +257,13 @@
       </div>
       <div class="cli-box-body">
 <pre><code># 1. Download best.pt directly via curl
-curl -L -O https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/best.pt
+curl -L -O https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.1.0/best.pt
 
 # 2. Or download via GitHub CLI
-gh release download v1.0.0 -p "best.pt"
+gh release download v1.1.0 -p "best.pt"
 
 # 3. Verify SHA-256 hash matches
-# Expected: c20dc36fcf15823b95ae967f24a27c6797c4d9649d1e48f949f5fb520de4df10
+# Expected: ca4a0efaa5a85f7d60470c167b56b813e7e79749ec6bfc3fcabf6d814034e19d
 certutil -hashfile best.pt SHA256   # On Windows
 sha256sum best.pt                   # On Linux / macOS</code></pre>
       </div>
@@ -275,29 +275,29 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
     <div class="section-header">
       <div class="section-eyebrow">TRAINING DYNAMICS & VALIDATION CONVERGENCE</div>
       <h2 class="section-title">Validation and held-out test results</h2>
-      <p class="section-lede">The detector was trained for 20 epochs on the merged 6-cohort dataset. Validation mAP@50 peaked at epoch 10 (<strong>92.23%</strong>) and declined to 83.55% by epoch 20 while training loss kept falling. The released checkpoint holds the epoch-10 weights. Because the validation split was also used to pick that checkpoint, the separate test split (891 images, never used during training or selection) is reported alongside it.</p>
+      <p class="section-lede">v1.1.0 was retrained for 20 epochs after fixing three data problems found in an audit of v1.0.0: polygon labels that Ultralytics misread, image-level tags stored as cell boxes, and evaluation images that reappear in other datasets' training splits. Both models are scored below on the same <strong>leak-free test set</strong>: 757 test images (4,631 boxes) with no near-duplicate in any training split, labels corrected. The released checkpoint is epoch 19, the best validation epoch.</p>
     </div>
 
     <div class="metric-strip">
       <div class="metric-card">
-        <div class="metric-stat">92.23%</div>
-        <div class="metric-name">mAP@50 (validation)</div>
-        <div class="metric-caption">Test split: 90.98%. Averaged over the 8 classes that have validation boxes.</div>
+        <div class="metric-stat">96.94%</div>
+        <div class="metric-name">mAP@50 (leak-free test)</div>
+        <div class="metric-caption">v1.0.0 on the same images: 93.96%. Validation: 94.1%.</div>
       </div>
       <div class="metric-card">
-        <div class="metric-stat">88.40%</div>
-        <div class="metric-name">Precision (validation)</div>
-        <div class="metric-caption">Test split: 86.40%.</div>
+        <div class="metric-stat">94.07%</div>
+        <div class="metric-name">Precision (leak-free test)</div>
+        <div class="metric-caption">v1.0.0: 86.82%.</div>
       </div>
       <div class="metric-card">
-        <div class="metric-stat">89.93%</div>
-        <div class="metric-name">Recall (validation)</div>
-        <div class="metric-caption">Test split: 89.73%.</div>
+        <div class="metric-stat">94.46%</div>
+        <div class="metric-name">Recall (leak-free test)</div>
+        <div class="metric-caption">v1.0.0: 90.64%.</div>
       </div>
       <div class="metric-card">
-        <div class="metric-stat">71.86%</div>
-        <div class="metric-name">mAP@50-95 (validation)</div>
-        <div class="metric-caption">Test split: 70.71%. Box quality averaged over IoU thresholds 0.50 to 0.95.</div>
+        <div class="metric-stat">77.10%</div>
+        <div class="metric-name">mAP@50-95 (leak-free test)</div>
+        <div class="metric-caption">v1.0.0: 72.57%. Box quality averaged over IoU thresholds 0.50 to 0.95.</div>
       </div>
       <div class="metric-card">
         <div class="metric-stat">≈ 3 ms</div>
@@ -312,30 +312,32 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
           <thead>
             <tr>
               <th>Class</th>
-              <th>Val AP@50</th>
-              <th>Test AP@50</th>
-              <th>Test AP@50-95</th>
-              <th>Test P</th>
-              <th>Test R</th>
+              <th>v1.0.0 AP@50</th>
+              <th>v1.1.0 AP@50</th>
+              <th>v1.1.0 AP@50-95</th>
+              <th>v1.1.0 P</th>
+              <th>v1.1.0 R</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Benign</td><td>0.987</td><td>0.961</td><td>0.657</td><td>0.889</td><td>0.944</td></tr>
-            <tr><td>Early</td><td>0.990</td><td>0.988</td><td>0.689</td><td>0.891</td><td>0.991</td></tr>
-            <tr><td>Pre</td><td>0.927</td><td>0.939</td><td>0.712</td><td>0.936</td><td>0.888</td></tr>
-            <tr><td>Pro</td><td>0.989</td><td>0.994</td><td>0.856</td><td>0.941</td><td>0.996</td></tr>
-            <tr><td>WBC</td><td>0.955</td><td>0.955</td><td>0.716</td><td>0.896</td><td>0.926</td></tr>
-            <tr><td>RBC</td><td>0.924</td><td>0.930</td><td>0.802</td><td>0.850</td><td>0.875</td></tr>
-            <tr><td>Platelets</td><td>0.790</td><td>0.716</td><td>0.480</td><td>0.732</td><td>0.667</td></tr>
-            <tr><td>Myeloblast</td><td>0.816</td><td>0.797</td><td>0.744</td><td>0.777</td><td>0.892</td></tr>
-            <tr><td>Lymphoblast</td><td colspan="5">Not evaluated: its only source (Acute-Leukemia) has no validation or test split.</td></tr>
-            <tr><td>Atypical</td><td colspan="5">Not evaluated: no training or evaluation boxes. Reserved for reviewer-assigned labels.</td></tr>
+            <tr><td>Benign</td><td>0.960</td><td><strong>0.969</strong></td><td>0.687</td><td>0.918</td><td>0.973</td></tr>
+            <tr><td>Early</td><td>0.988</td><td><strong>0.985</strong></td><td>0.702</td><td>0.945</td><td>0.988</td></tr>
+            <tr><td>Pre</td><td>0.987</td><td><strong>0.990</strong></td><td>0.795</td><td>0.953</td><td>0.987</td></tr>
+            <tr><td>Pro</td><td>0.994</td><td><strong>0.994</strong></td><td>0.870</td><td>0.971</td><td>0.994</td></tr>
+            <tr><td>WBC</td><td>0.966</td><td><strong>0.974</strong></td><td>0.730</td><td>0.942</td><td>0.924</td></tr>
+            <tr><td>RBC</td><td>0.909</td><td><strong>0.961</strong></td><td>0.849</td><td>0.872</td><td>0.916</td></tr>
+            <tr><td>Platelets</td><td>0.851</td><td><strong>0.940</strong></td><td>0.667</td><td>1.000</td><td>0.782</td></tr>
+            <tr><td>Myeloblast</td><td>0.862</td><td><strong>0.941</strong></td><td>0.869</td><td>0.925</td><td>0.994</td></tr>
+            <tr><td>Lymphoblast</td><td>–</td><td colspan="4">No test split. On the validation holdout: AP@50 0.743, AP@50-95 0.612, P 0.689, R 0.780. The weakest class.</td></tr>
+            <tr><td>Atypical</td><td>–</td><td colspan="4">Not evaluated: no training or evaluation boxes. Reserved for reviewer-assigned labels.</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <p class="section-lede"><strong>Limitations.</strong> The evaluation splits are the original per-dataset splits, so these numbers measure in-distribution performance. Leukemia-NFXZN supplies 74% of the validation boxes, so it dominates the averages. All sources are camera images of smear fields. The model has not been evaluated on whole-slide scans, and tiles are not resampled to a common microns-per-pixel scale before inference.</p>
+    <p class="section-lede"><strong>Whole-slide tiling.</strong> <code>evaluate_tiling.py</code> stitches 64 test images into a 4800×4800 pyramidal TIFF and runs the sliding-window pipeline on it. The pipeline scores mAP@50 97.7% against 98.0% for predicting each image directly, so tiling, coordinate mapping and global NMS cost almost nothing. This checks the tiling code only: a mosaic of camera fields is not a scanned slide.</p>
+
+    <p class="section-lede"><strong>Limitations.</strong> Test images come from the original per-dataset splits, so these are in-distribution numbers, and Leukemia-NFXZN supplies 309 of the 757 test images. Blast-Cell-Detection has no leak-free test images at all: every one has a near-copy in another dataset's training split. Platelets rest on 26 BCCD images, so their AP is noisy. Lymphoblast was only measured on a validation holdout that also picked the checkpoint. The model has not been evaluated on real whole-slide scans, and tiles are not resampled to a common microns-per-pixel scale.</p>
   </section>
 
   <!-- SECTION: INTERACTIVE TABBED VISUALIZER -->
@@ -387,7 +389,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/results.png" alt="Training Convergence Curves" loading="lazy">
             <div class="figure-caption">
               <h4>Training & Validation Trajectory Across 20 Epochs</h4>
-              <p>Tracking box loss, classification loss, distribution focal loss (DFL), and mAP metrics. Validation mAP@50 peaked at epoch 10 (92.23%). The jump in losses at epoch 11 matches Ultralytics switching off mosaic augmentation for the final 10 epochs, after which validation mAP fell to 83.55%.</p>
+              <p>Box, classification and distribution focal (DFL) losses with validation metrics for all 20 epochs. Validation mAP@50 rose to 94.1% at epoch 19. Unlike v1.0.0, which fell from 92.2% to 83.6% once mosaic augmentation switched off at epoch 11, it kept improving after the switch.</p>
             </div>
           </div>
 
@@ -429,7 +431,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/BoxPR_curve.png" alt="Precision-Recall Curve" loading="lazy">
             <div class="figure-caption">
               <h4>Precision-Recall (PR) Curve</h4>
-              <p>Precision-recall curves at IoU 0.50 for the 8 classes that have validation boxes. Lymphoblast and Atypical have none.</p>
+              <p>Precision-recall curves at IoU 0.50 for the 9 classes that have validation boxes. Atypical has none.</p>
             </div>
           </div>
 
@@ -437,7 +439,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/BoxF1_curve.png" alt="F1 Score vs Confidence Calibration" loading="lazy">
             <div class="figure-caption">
               <h4>F1 Score vs Confidence Threshold Calibration</h4>
-              <p>Identifies optimal operating threshold for production inference. The all-class F1 score peaks at 0.89 at confidence 0.331. The pipeline default is 0.25.</p>
+              <p>Identifies optimal operating threshold for production inference. The all-class F1 score peaks at 0.91 at confidence 0.415. The pipeline default is 0.25.</p>
             </div>
           </div>
         </div>
@@ -478,7 +480,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
     <div class="section-header">
       <div class="section-eyebrow">DATALAKE HARMONIZATION</div>
       <h2 class="section-title">Aggregated Multi-Cohort Datalake (25,875 Fields)</h2>
-      <p class="section-lede">Six public Roboflow datasets were merged and remapped into one 10-class taxonomy with 115,548 bounding boxes. Each dataset keeps its original train, valid, and test split. The test splits were not used during training or checkpoint selection.</p>
+      <p class="section-lede">Six public Roboflow datasets are merged and remapped into one 10-class taxonomy. The table shows the raw sources (115,548 boxes). Merging now cleans them in three ways. Polygon rows are converted to boxes; Leukemia-NFXZN mixes both formats in 1,010 label files, which Ultralytics misreads. Near-full-frame image tags are dropped (465 in Myeloblast-fbliw, 119 in Blood-Cell-znm2t). And train images that nearly duplicate any validation or test image are removed (676), because several sources re-export the same micrographs. Acute-Leukemia, which ships without a validation split, lends about 10% of its source images to validation. The v1.1.0 training set is 22,366 images (96,573 boxes), with 1,749 validation images (10,942 boxes).</p>
     </div>
 
     <div class="table-card">
@@ -578,7 +580,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
     <div class="section-header">
       <div class="section-eyebrow">MORPHOLOGY TAXONOMY</div>
       <h2 class="section-title">Unified 10-Class Cellular Taxonomy</h2>
-      <p class="section-lede">Box counts are totals across train, valid, and test after remapping. Descriptions give the usual morphology of each class. The model learns from the labels alone and does not measure these features explicitly.</p>
+      <p class="section-lede">Box counts are raw source totals across train, valid, and test after remapping, before the cleaning described above. Descriptions give the usual morphology of each class. The model learns from the labels alone and does not measure these features explicitly.</p>
     </div>
 
     <div class="taxonomy-grid">
@@ -619,7 +621,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
           <div class="tax-name">Lymphoblast</div>
           <div class="tax-count">3,162 cells</div>
         </div>
-        <p class="tax-desc">Lymphoblasts from the Acute-Leukemia dataset only. Train split only, so this class has no validation or test measurement.</p>
+        <p class="tax-desc">Lymphoblasts from the Acute-Leukemia dataset only. Measured on a 10% validation holdout (AP@50 0.743), the weakest class. There is no test split.</p>
       </div>
 
       <div class="tax-card">
@@ -643,7 +645,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
           <div class="tax-name">RBC</div>
           <div class="tax-count">8,447 cells</div>
         </div>
-        <p class="tax-desc">Erythrocytes from BCCD. Also includes 472 boxes from Myeloblast-fbliw, 465 of which cover more than 80% of the image and are image-level tags, not cells.</p>
+        <p class="tax-desc">Erythrocytes from BCCD. The count includes 472 Myeloblast-fbliw boxes, 465 of which cover more than 80% of the image; these image-level tags are dropped from v1.1.0 training.</p>
       </div>
 
       <div class="tax-card">
@@ -651,7 +653,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
           <div class="tax-name">Platelets</div>
           <div class="tax-count">271 cells</div>
         </div>
-        <p class="tax-desc">Platelets from BCCD. The rarest trained class and the weakest on the test split (AP@50 0.716).</p>
+        <p class="tax-desc">Platelets from BCCD. The rarest trained class. Leak-free test AP@50 0.940, measured on only 26 images.</p>
       </div>
 
       <div class="tax-card">
@@ -700,7 +702,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
       <div class="flow-step">
         <div class="step-num">Step 05</div>
         <div class="step-title">Global NMS</div>
-        <div class="step-desc">Re-projects local tile coordinates to slide space and eliminates edge duplicates (IoU 0.45).</div>
+        <div class="step-desc">Drops boxes cut by interior tile edges, maps the rest to slide coordinates, and removes duplicates (IoU 0.45).</div>
       </div>
 
       <div class="flow-step">
@@ -714,7 +716,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
       <div class="module-card">
         <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">inference_pipeline.py</div>
         <h3>Gigapixel Sliding-Window Engine</h3>
-        <p>Reads whole-slide images with tiffslide, skips background tiles, extracts 512×512 patches with 25% overlap, and maps tile detections back to slide coordinates before global NMS.</p>
+        <p>Reads whole-slide images with tiffslide, skips background tiles, and runs 512×512 patches with 25% overlap in batches. Boxes touching an interior tile edge are dropped, since the overlap shows those cells whole in a neighbor tile. The rest are mapped to slide coordinates for global NMS.</p>
       </div>
 
       <div class="module-card">
@@ -773,8 +775,8 @@ pip install -r requirements.txt
 # 4. Check active model weights (pre-loaded in repository)
 ls -lh data/models/active_model.pt
 
-# Option: Or fetch best.pt directly from GitHub Release v1.0.0
-curl -L -O https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/best.pt</code></pre>
+# Option: Or fetch best.pt directly from GitHub Release v1.1.0
+curl -L -O https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.1.0/best.pt</code></pre>
         </div>
 
         <!-- CODE 2: PYTHON INFERENCE -->
@@ -845,7 +847,7 @@ python training_pipeline.py --mode hitl</code></pre>
       </div>
       <div class="footer-links">
         <a class="footer-link" href="https://github.com/abusuraihsakhri/blast-detection-algo" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
-        <a class="footer-link" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">Release v1.0.0</a>
+        <a class="footer-link" href="https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.1.0" target="_blank" rel="noopener noreferrer">Release v1.1.0</a>
         <a class="footer-link" href="#results">Validation Metrics</a>
       </div>
     </div>

@@ -5,9 +5,9 @@
 [![Domain](https://img.shields.io/badge/Domain-Digital%20Hematopathology%20%7C%20Leukemia-purple.svg)](https://github.com/abusuraihsakhri/blast-detection-algo)
 [![PyTorch](https://img.shields.io/badge/Backend-PyTorch%20%7C%20CUDA%20AMP-blue.svg)](https://pytorch.org/)
 [![YOLOv8](https://img.shields.io/badge/Architecture-YOLOv8n%20(3.01M%20Params)-brightgreen.svg)](https://github.com/ultralytics/ultralytics)
-[![Validation](https://img.shields.io/badge/mAP%4050-92.23%25-success.svg)](https://github.com/abusuraihsakhri/blast-detection-algo)
+[![Test mAP@50](https://img.shields.io/badge/Leak--free%20test%20mAP%4050-96.94%25-success.svg)](https://github.com/abusuraihsakhri/blast-detection-algo)
 [![Datalake](https://img.shields.io/badge/Datalake-25%2C875%20Fields%20%7C%20115%2C548%20Cells-orange.svg)](https://github.com/abusuraihsakhri/blast-detection-algo)
-[![Release](https://img.shields.io/github/v/release/abusuraihsakhri/blast-detection-algo?color=blueviolet&label=Model%20Release)](https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0)
+[![Release](https://img.shields.io/github/v/release/abusuraihsakhri/blast-detection-algo?color=blueviolet&label=Model%20Release)](https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.1.0)
 
 A computer vision and active learning pipeline for detecting and classifying **Leukemic Blasts** in peripheral blood smears and Whole Slide Images (WSIs). Trained across **25,875 microscopy fields** (**115,548 annotated cells** across 6 curated cohorts). Features PyTorch YOLOv8 detection, sliding-window WSI tiling with boundary-aware Non-Maximum Suppression (NMS), a local review and sandbox web UI, and an Experience Replay Buffer that prevents catastrophic forgetting during incremental training.
 
@@ -15,23 +15,40 @@ A computer vision and active learning pipeline for detecting and classifying **L
 
 ## 📊 Evaluation Results (Multi-Center Dataset Benchmark)
 
-The model was trained for 20 epochs on the unified dataset. Validation mAP@50 peaked at epoch 10 and fell to 83.55% by epoch 20, so the released checkpoint holds the epoch-10 weights. The validation split also chose that checkpoint, so the table reports the per-dataset test splits as well. The test splits were not used for training or selection.
+v1.1.0 was retrained for 20 epochs after an audit of v1.0.0 found three data problems:
 
-| Metric | Validation (epoch 10) | Test split | Description |
+- **Mixed label formats.** Leukemia-NFXZN mixes box and polygon rows in 1,010 label files. Ultralytics reads such a file as all-polygon and garbles its 2,840 box rows.
+- **Image-level tags stored as cell boxes.** 465 Myeloblast-fbliw "RBC" boxes and 119 Blood-Cell-znm2t polygons cover more than 80% of the image.
+- **Leakage across datasets.** Several sources re-export the same micrographs, so evaluation images reappear in other datasets' training splits. Every Blast-Cell-Detection test image has a near-copy in another training split.
+
+Both models are scored on the same **leak-free test set**: 757 test images (4,631 boxes) with no near-duplicate in any training split, and corrected labels. The checkpoint is epoch 19, the best validation epoch.
+
+| Metric | v1.0.0 | v1.1.0 | Description |
 | :--- | :---: | :---: | :--- |
-| **mAP@50** | **92.23%** | **90.98%** | Mean AP at IoU 0.50 over the 8 classes with evaluation boxes |
-| **Precision ($P$)** | **88.40%** | **86.40%** | Mean precision across classes |
-| **Recall ($R$)** | **89.93%** | **89.73%** | Mean recall across classes |
-| **mAP@50-95** | **71.86%** | **70.71%** | Mean AP averaged over IoU thresholds 0.50–0.95 |
-| **Inference latency** | ≈ 3 ms / image | | 640 px, batch 16, RTX 3060 Laptop GPU, plus ≈ 1 ms NMS |
-| **Parameters** | 3.01 million | | YOLOv8n |
-| **Weights** | `data/models/active_model.pt` | | 6.25 MB, also attached to Release v1.0.0 |
+| **mAP@50** | 93.96% | **96.94%** | Mean AP at IoU 0.50 over the 8 classes with test boxes |
+| **mAP@50-95** | 72.57% | **77.10%** | Mean AP averaged over IoU thresholds 0.50–0.95 |
+| **Precision ($P$)** | 86.82% | **94.07%** | Mean precision across classes |
+| **Recall ($R$)** | 90.64% | **94.46%** | Mean recall across classes |
+| **Validation mAP@50** | | 94.10% | 9 classes, including the Lymphoblast holdout |
+| **Inference latency** | | ≈ 3 ms / image | 640 px, batch 16, RTX 3060 Laptop GPU, plus ≈ 1 ms NMS |
+| **Weights** | | `data/models/active_model.pt` | 6.27 MB, also attached to Release v1.1.0 |
 
-### 📈 Convergence & Evaluation Plots
+| Class | v1.0.0 AP@50 | v1.1.0 AP@50 | v1.1.0 AP@50-95 |
+| :--- | :---: | :---: | :---: |
+| Benign | 0.960 | **0.969** | 0.687 |
+| Early | 0.988 | **0.985** | 0.702 |
+| Pre | 0.987 | **0.990** | 0.795 |
+| Pro | 0.994 | **0.994** | 0.870 |
+| WBC | 0.966 | **0.974** | 0.730 |
+| RBC | 0.909 | **0.961** | 0.849 |
+| Platelets | 0.851 | **0.940** | 0.667 |
+| Myeloblast | 0.862 | **0.941** | 0.869 |
 
-Per-class AP@50 on the test split: Benign 0.961, Early 0.988, Pre 0.939, Pro 0.994, WBC 0.955, RBC 0.930, Platelets 0.716, Myeloblast 0.797. Lymphoblast has no validation or test boxes (its only source has a train split only). Atypical has no boxes at all, so the released model has never seen an example of it.
+Lymphoblast has no test split. On its validation holdout, v1.1.0 reaches AP@50 0.743 (AP@50-95 0.612), the weakest class. Atypical has no boxes at all, so the model has never seen an example of it.
 
-**Limitations.** These are in-distribution numbers on the original per-dataset splits, and Leukemia-NFXZN supplies 74% of the validation boxes. All sources are camera images of smear fields. The model has not been evaluated on whole-slide scans, and tiles are not resampled to a common microns-per-pixel scale before inference.
+**Whole-slide tiling.** `python evaluate_tiling.py` stitches 64 test images into a 4800×4800 pyramidal TIFF and runs the sliding-window pipeline on it. The pipeline reaches mAP@50 97.7%, against 98.0% when each image is predicted directly. This checks the tiling code, not scanner or staining shift on real slides.
+
+**Limitations.** These are in-distribution numbers on the original per-dataset test splits, and Leukemia-NFXZN supplies 309 of the 757 leak-free test images. Platelets rest on 26 BCCD images. Lymphoblast's holdout also picked the checkpoint, so its number is slightly optimistic. The model has not been evaluated on real whole-slide scans, and tiles are not resampled to a common microns-per-pixel scale before inference.
 
 | Training Loss & Convergence | Normalized Confusion Matrix |
 | :---: | :---: |
@@ -41,13 +58,13 @@ Per-class AP@50 on the test split: Benign 0.961, Early 0.988, Pre 0.939, Pro 0.9
 | :---: | :---: |
 | ![PR Curve](docs/assets/BoxPR_curve.png) | ![F1 Curve](docs/assets/BoxF1_curve.png) |
 
-*Trained weights are tracked at [`data/models/active_model.pt`](data/models/active_model.pt) and downloadable via [GitHub Release v1.0.0](https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.0.0).*
+*Trained weights are tracked at [`data/models/active_model.pt`](data/models/active_model.pt) and downloadable via [GitHub Release v1.1.0](https://github.com/abusuraihsakhri/blast-detection-algo/releases/tag/v1.1.0). v1.0.0 stays available on its release page.*
 
 ---
 
 ## 🔬 Dataset Overview (25,875 Fields / 115,548 Cells)
 
-The training data merges 6 public research datasets into a unified 10-class taxonomy:
+The training data merges 6 public research datasets into a unified 10-class taxonomy. The table shows the raw sources. Merging converts polygon rows to boxes, drops image-level tags, and removes 676 train images that duplicate validation or test images. Acute-Leukemia lends about 10% of its source images to validation. The v1.1.0 training set is 22,366 images (96,573 boxes), with 1,749 validation images.
 
 | # | Dataset / Source | Scope / Target Classes | Train | Valid | Test | Total Images | Annotated Cells |
 | :-: | :--- | :--- | :-: | :-: | :-: | :-: | :-: |
@@ -69,7 +86,7 @@ The training data merges 6 public research datasets into a unified 10-class taxo
 6. **RBC (5):** Mature erythrocytes.
 7. **Platelets (6):** Thrombocytes.
 8. **Myeloblast (7):** Acute Myeloid Leukemia (AML) blasts.
-9. **Lymphoblast (8):** Generic acute lymphoblastic leukemia blasts.
+9. **Lymphoblast (8):** Generic acute lymphoblastic leukemia blasts. From Acute-Leukemia only; the weakest class (validation AP@50 0.743).
 10. **Atypical (9):** Reserved for reviewer-assigned labels in the review UI. No source dataset maps to it, so it has no training examples.
 
 ---
@@ -92,6 +109,7 @@ The training data merges 6 public research datasets into a unified 10-class taxo
                                    │
                                    ▼
            [ Global Boundary Non-Maximum Suppression (NMS) ]
+             ├── Drop Boxes Cut by Interior Tile Edges
              ├── Local Tile Coordinates -> Global WSI Coordinates Re-Projection
              └── Vectorized Agnostic NMS (IoU = 0.45, Conf >= 0.25)
                                    │
@@ -142,8 +160,8 @@ pip install -r requirements.txt
 ### 2. Verify Pre-Loaded Model Weights
 The active model weights are committed directly in the repository at `data/models/active_model.pt`. You can also download them from GitHub Releases:
 ```bash
-# Optional: download official v1.0.0 release checkpoint
-curl -L -o data/models/active_model.pt https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.0.0/active_model.pt
+# Optional: download the v1.1.0 release checkpoint
+curl -L -o data/models/active_model.pt https://github.com/abusuraihsakhri/blast-detection-algo/releases/download/v1.1.0/active_model.pt
 ```
 
 ### 3. Launch Review & Sandbox UI
