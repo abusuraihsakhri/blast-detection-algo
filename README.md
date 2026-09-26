@@ -183,6 +183,21 @@ node --check public/app.js
 
 ---
 
+## Dataset attribution
+
+The training data come from public Roboflow Universe datasets:
+
+| Dataset | Source | License |
+| :--- | :--- | :--- |
+| Leukemia-NFXZN | [tawfiq-islam-hfp3h/leukemia-nfxzn](https://universe.roboflow.com/tawfiq-islam-hfp3h/leukemia-nfxzn/dataset/1) | CC BY 4.0 |
+| Blast-Cell-Detection | [yolov4-njwoe/blast-cell-detection](https://universe.roboflow.com/yolov4-njwoe/blast-cell-detection) (versions 26–28) | Not recorded in the download; check the source page |
+| BCCD | [bccd-vhdu3/blood-cell-cella-bccd-lihfn](https://universe.roboflow.com/bccd-vhdu3/blood-cell-cella-bccd-lihfn/dataset/1) | CC BY 4.0 |
+| Blood-Cell-znm2t | [aninp/blood-cell-znm2t](https://universe.roboflow.com/aninp/blood-cell-znm2t/dataset/1) | CC BY 4.0 |
+| Acute-Leukemia | [yolov4-njwoe/acute-leukemia](https://universe.roboflow.com/yolov4-njwoe/acute-leukemia/dataset/1) | CC BY 4.0 |
+| Myeloblast-fbliw | [nhung-o028n/myeloblast-fbliw](https://universe.roboflow.com/nhung-o028n/myeloblast-fbliw/dataset/1) | CC BY 4.0 |
+
+The detector is trained with [Ultralytics YOLO](https://github.com/ultralytics/ultralytics), which is licensed under AGPL-3.0.
+
 ## ⚖️ License & Disclaimer
 
 Distributed under the **Apache License 2.0**.
