@@ -137,46 +137,20 @@ class InferencePipeline:
         start_time = time.time()
 
         try:
-            for x0, y0, img, tissue_pct in wsi.extract_patches():
-                result = self.model.predict(
-                    img,
-                    conf=settings.inference_conf_threshold,
-                    verbose=False,
-                )[0]
-                boxes = result.boxes
-                if len(boxes) == 0 and not settings.save_empty_tiles:
-                    continue
-
-                img_filename = (
-                    f"{Path(wsi_name).stem}_{self.run_id}_{x0}_{y0}.jpg"
-                )
-                img_save_path = RAW_TILES_DIR / img_filename
-                img.save(img_save_path, "JPEG", quality=90)
-                valid_tiles_info.append(
-                    {
-                        "x": x0,
-                        "y": y0,
-                        "tissue": tissue_pct,
-                        "filename": img_filename,
-                        "downsample": wsi.downsample,
-                    }
-                )
-
-                for box in boxes:
-                    x_c_n, y_c_n, w_n, h_n = box.xywhn[0].cpu().numpy()
-                    scale = settings.tile_size * wsi.downsample
-                    gx1 = x0 + (float(x_c_n) - float(w_n) / 2.0) * scale
-                    gy1 = y0 + (float(y_c_n) - float(h_n) / 2.0) * scale
-                    gx2 = x0 + (float(x_c_n) + float(w_n) / 2.0) * scale
-                    gy2 = y0 + (float(y_c_n) + float(h_n) / 2.0) * scale
-                    all_global_detections.append(
-                        {
-                            "box": [gx1, gy1, gx2, gy2],
-                            "score": float(box.conf[0].cpu()),
-                            "class_idx": int(box.cls[0].cpu()),
-                            "tile_filename": img_filename,
-                        }
+            batch: List[Tuple[int, int, Image.Image, float]] = []
+            for patch in wsi.extract_patches():
+                batch.append(patch)
+                if len(batch) >= settings.inference_batch_size:
+                    self._process_batch(
+                        batch, wsi, wsi_name,
+                        all_global_detections, valid_tiles_info,
                     )
+                    batch = []
+            if batch:
+                self._process_batch(
+                    batch, wsi, wsi_name,
+                    all_global_detections, valid_tiles_info,
+                )
         finally:
             wsi.close()
 
@@ -194,6 +168,54 @@ class InferencePipeline:
             "Inference complete in {:.2f}s",
             time.time() - start_time,
         )
+
+    def _process_batch(
+        self,
+        batch: List[Tuple[int, int, Image.Image, float]],
+        wsi: "WsiScanner",
+        wsi_name: str,
+        detections: List[Dict],
+        tiles_info: List[Dict],
+    ) -> None:
+        results = self.model.predict(
+            [img for _, _, img, _ in batch],
+            conf=settings.inference_conf_threshold,
+            verbose=False,
+        )
+        for (x0, y0, img, tissue_pct), result in zip(batch, results):
+            boxes = result.boxes
+            if len(boxes) == 0 and not settings.save_empty_tiles:
+                continue
+
+            img_filename = (
+                f"{Path(wsi_name).stem}_{self.run_id}_{x0}_{y0}.jpg"
+            )
+            img.save(RAW_TILES_DIR / img_filename, "JPEG", quality=90)
+            tiles_info.append(
+                {
+                    "x": x0,
+                    "y": y0,
+                    "tissue": tissue_pct,
+                    "filename": img_filename,
+                    "downsample": wsi.downsample,
+                }
+            )
+
+            scale = settings.tile_size * wsi.downsample
+            for box in boxes:
+                x_c_n, y_c_n, w_n, h_n = box.xywhn[0].cpu().numpy()
+                gx1 = x0 + (float(x_c_n) - float(w_n) / 2.0) * scale
+                gy1 = y0 + (float(y_c_n) - float(h_n) / 2.0) * scale
+                gx2 = x0 + (float(x_c_n) + float(w_n) / 2.0) * scale
+                gy2 = y0 + (float(y_c_n) + float(h_n) / 2.0) * scale
+                detections.append(
+                    {
+                        "box": [gx1, gy1, gx2, gy2],
+                        "score": float(box.conf[0].cpu()),
+                        "class_idx": int(box.cls[0].cpu()),
+                        "tile_filename": img_filename,
+                    }
+                )
 
     def _apply_global_nms(self, detections: List[Dict]) -> List[Dict]:
         boxes_tensor = torch.tensor(

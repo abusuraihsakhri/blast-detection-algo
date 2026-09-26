@@ -48,6 +48,7 @@ class AppSettings(BaseSettings):
     inference_overlap_pct: float = Field(default=0.25, ge=0.0, lt=1.0)
     inference_conf_threshold: float = Field(default=0.25, ge=0.0, le=1.0)
     nms_iou_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
+    inference_batch_size: int = Field(default=16, ge=1, le=256)
     max_tiles_to_save_per_wsi: int = Field(default=5000, ge=1)
     save_empty_tiles: bool = True
 
