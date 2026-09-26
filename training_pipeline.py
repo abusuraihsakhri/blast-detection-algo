@@ -318,9 +318,19 @@ class WarmStartTrainer:
         max_samples: Optional[int] = None,
         resume: bool = False,
     ) -> None:
-        data_yaml = self.prepare_unified_dataset(
-            max_samples=max_samples
-        )
+        if resume:
+            # The checkpoint points at the existing merged dataset;
+            # rebuilding it would change the data mid-run.
+            data_yaml = self.unified_train_dir / "dataset.yaml"
+            if not data_yaml.exists():
+                raise FileNotFoundError(
+                    "Cannot resume: merged dataset missing at "
+                    f"{data_yaml}. Start a new run instead."
+                )
+        else:
+            data_yaml = self.prepare_unified_dataset(
+                max_samples=max_samples
+            )
         session = SessionLocal()
         audit = TrainingAuditLogger(session)
         actual_epochs = (

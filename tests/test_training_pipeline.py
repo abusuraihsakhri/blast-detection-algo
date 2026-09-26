@@ -1,6 +1,8 @@
 import sys
 import types
 
+import pytest
+
 # CI installs only core dependencies; training_pipeline imports YOLO at module level.
 sys.modules.setdefault("ultralytics", types.SimpleNamespace(YOLO=object))
 
@@ -81,3 +83,15 @@ def test_train_only_dataset_lends_holdout_to_validation(tmp_path):
     assert len(valid | train) == 100
     assert len(list((trainer.unified_train_dir / "train" / "images").glob("has-valid_*"))) == 2
     assert len(list((trainer.unified_train_dir / "valid" / "images").glob("has-valid_*"))) == 1
+
+
+def test_resume_does_not_rebuild_the_merged_dataset(tmp_path, monkeypatch):
+    trainer = WarmStartTrainer()
+    trainer.unified_train_dir = tmp_path / "unified"
+
+    def fail_rebuild(**_):
+        raise AssertionError("resume must not rebuild the dataset")
+
+    monkeypatch.setattr(trainer, "prepare_unified_dataset", fail_rebuild)
+    with pytest.raises(FileNotFoundError, match="Cannot resume"):
+        trainer.train(resume=True)
