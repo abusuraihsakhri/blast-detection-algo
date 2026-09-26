@@ -77,6 +77,26 @@ def _metric_map50(results) -> float:
     )
 
 
+MAX_CELL_BOX_AREA = 0.8
+
+
+def _is_cell_box(parts: list[str]) -> bool:
+    """Return False for YOLO label rows that are not real cell boxes.
+
+    ``parts`` is one label row split on whitespace:
+    [class_id, x_center, y_center, width, height], coordinates normalized 0-1.
+
+    Myeloblast-fbliw tags 465 of its 472 "RBC" boxes as near-full-frame
+    rectangles (width * height > 0.8). These are image-level tags, and they
+    currently enter training and validation as RBC targets.
+    """
+    try:
+        width, height = float(parts[3]), float(parts[4])
+    except (IndexError, ValueError):
+        return False
+    return width * height <= MAX_CELL_BOX_AREA
+
+
 def _latest_checkpoint(prefix: str) -> Path:
     detect_dir = PROJECT_ROOT / "runs" / "detect"
     if not detect_dir.exists():
@@ -224,7 +244,7 @@ class WarmStartTrainer:
                     src,
                 )
                 continue
-            if original in class_map:
+            if original in class_map and _is_cell_box(parts):
                 parts[0] = str(class_map[original])
                 lines.append(" ".join(parts))
 
