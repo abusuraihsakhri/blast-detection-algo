@@ -15,19 +15,23 @@ A computer vision and active learning pipeline for detecting and classifying **L
 
 ## 📊 Evaluation Results (Multi-Center Dataset Benchmark)
 
-The model was trained for 20 epochs on the unified dataset and evaluated on holdout validation splits:
+The model was trained for 20 epochs on the unified dataset. Validation mAP@50 peaked at epoch 10 and fell to 83.55% by epoch 20, so the released checkpoint holds the epoch-10 weights. The validation split also chose that checkpoint, so the table reports the per-dataset test splits as well. The test splits were not used for training or selection.
 
-| Metric | Checkpoint Value | Description |
-| :--- | :---: | :--- |
-| **mAP@50** | **92.23%** (`0.9223`) | Overall detection sensitivity across blast subtypes at 0.50 IoU |
-| **Precision ($P$)** | **88.40%** (`0.8840`) | Detection precision across blast and non-blast classes |
-| **Recall ($R$)** | **89.93%** (`0.8993`) | Detection recall across cell annotations |
-| **mAP@50-95** | **71.86%** (`0.7186`) | Bounding box regression accuracy across IoU thresholds (0.50–0.95) |
-| **Inference Latency** | **1.2 – 2.8 ms / tile** | Single-tile forward pass latency on CUDA GPU |
-| **Parameters** | **3.01 Million** | Compact YOLOv8n backbone |
-| **Weights** | `data/models/active_model.pt` | 6.25 MB weights file committed in repository and attached to Release v1.0.0 |
+| Metric | Validation (epoch 10) | Test split | Description |
+| :--- | :---: | :---: | :--- |
+| **mAP@50** | **92.23%** | **90.98%** | Mean AP at IoU 0.50 over the 8 classes with evaluation boxes |
+| **Precision ($P$)** | **88.40%** | **86.40%** | Mean precision across classes |
+| **Recall ($R$)** | **89.93%** | **89.73%** | Mean recall across classes |
+| **mAP@50-95** | **71.86%** | **70.71%** | Mean AP averaged over IoU thresholds 0.50–0.95 |
+| **Inference latency** | ≈ 3 ms / image | | 640 px, batch 16, RTX 3060 Laptop GPU, plus ≈ 1 ms NMS |
+| **Parameters** | 3.01 million | | YOLOv8n |
+| **Weights** | `data/models/active_model.pt` | | 6.25 MB, also attached to Release v1.0.0 |
 
 ### 📈 Convergence & Evaluation Plots
+
+Per-class AP@50 on the test split: Benign 0.961, Early 0.988, Pre 0.939, Pro 0.994, WBC 0.955, RBC 0.930, Platelets 0.716, Myeloblast 0.797. Lymphoblast has no validation or test boxes (its only source has a train split only). Atypical has no boxes at all, so the released model has never seen an example of it.
+
+**Limitations.** These are in-distribution numbers on the original per-dataset splits, and Leukemia-NFXZN supplies 74% of the validation boxes. All sources are camera images of smear fields. The model has not been evaluated on whole-slide scans, and tiles are not resampled to a common microns-per-pixel scale before inference.
 
 | Training Loss & Convergence | Normalized Confusion Matrix |
 | :---: | :---: |
@@ -48,10 +52,10 @@ The training data merges 6 public research datasets into a unified 10-class taxo
 | # | Dataset / Source | Scope / Target Classes | Train | Valid | Test | Total Images | Annotated Cells |
 | :-: | :--- | :--- | :-: | :-: | :-: | :-: | :-: |
 | **1** | **Leukemia-NFXZN** (Tawfiq Islam) | B-ALL subtyping (Benign, Early, Pre, Pro) | 6,589 | 622 | 312 | 7,523 | 83,854 |
-| **2** | **Blast-Cell-Detection** (YOLOv4) | Binary blast vs mature leukocyte | 3,011 | 72 | 39 | 3,122 | 3,365 |
+| **2** | **Blast-Cell-Detection** (YOLOv4) | Binary blast vs leukocyte (blasts remapped to Pre) | 3,011 | 72 | 39 | 3,122 | 3,365 |
 | **3** | **BCCD Blood Cell Foundation** | Baseline elements (WBC, RBC, Platelets) | 377 | 110 | 53 | 540 | 8,851 |
-| **4** | **Blood-Cell-znm2t Differential** | Leukocyte differential subtypes | 9,105 | 389 | 387 | 9,881 | 10,589 |
-| **5** | **Acute-Leukemia AML/ALL** | Myeloblast vs Lymphoblast | 3,809 | 0 | 0 | 3,809 | 7,626 |
+| **4** | **Blood-Cell-znm2t Differential** | Leukocyte differential (8 subtypes, all merged into WBC) | 9,105 | 389 | 387 | 9,881 | 10,589 |
+| **5** | **Acute-Leukemia AML/ALL** | Myeloblast vs Lymphoblast (train split only) | 3,809 | 0 | 0 | 3,809 | 7,626 |
 | **6** | **Myeloblast-fbliw Dedicated** | Acute myeloid leukemia blasts | 700 | 200 | 100 | 1,000 | 1,263 |
 | | **Grand Total** | | **23,591** | **1,393** | **891** | **25,875** | **115,548** |
 
@@ -66,7 +70,7 @@ The training data merges 6 public research datasets into a unified 10-class taxo
 7. **Platelets (6):** Thrombocytes.
 8. **Myeloblast (7):** Acute Myeloid Leukemia (AML) blasts.
 9. **Lymphoblast (8):** Generic acute lymphoblastic leukemia blasts.
-10. **Atypical (9):** Morphologically ambiguous / dysplastic cells flagged for review.
+10. **Atypical (9):** Reserved for reviewer-assigned labels in the review UI. No source dataset maps to it, so it has no training examples.
 
 ---
 
@@ -84,7 +88,7 @@ The training data merges 6 public research datasets into a unified 10-class taxo
                 [ Neural Detection Backbone ]
              ├── Architecture: YOLOv8n (3.01M Parameters)
              ├── 10-Class Taxonomy (ALL, AML, Normal Lineages)
-             └── CUDA AMP Inference Engine (1.2–2.8 ms / tile)
+             └── ≈ 3 ms / image on an RTX 3060 Laptop GPU
                                    │
                                    ▼
            [ Global Boundary Non-Maximum Suppression (NMS) ]

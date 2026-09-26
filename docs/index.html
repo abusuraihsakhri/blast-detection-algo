@@ -74,7 +74,7 @@
           <span>WEIGHTS COMMITTED & RELEASED · v1.0.0</span>
         </div>
         <h1 class="hero-title">Empirical detection and classification of <em>Leukemic Blasts.</em></h1>
-        <p class="hero-lede">A PyTorch and YOLOv8n pipeline trained on <strong>25,875 microscopy fields</strong> with <strong>115,548 expert-annotated cells</strong> across 6 research cohorts. Features automated whole slide image (WSI) sliding-window tiling, multi-class blast morphology classification, and experience replay active learning.</p>
+        <p class="hero-lede">A PyTorch and YOLOv8n pipeline trained on <strong>25,875 microscopy fields</strong> with <strong>115,548 annotated cells</strong> across 6 research cohorts. Features automated whole slide image (WSI) sliding-window tiling, multi-class blast morphology classification, and experience replay active learning.</p>
         
         <div class="hero-actions">
           <a class="btn-primary" href="#downloads">
@@ -120,8 +120,8 @@
 
         <div class="hud-grid">
           <div class="hud-item">
-            <div class="hud-label">Peak mAP@50</div>
-            <div class="hud-value highlight">92.23%</div>
+            <div class="hud-label">mAP@50 (val / test)</div>
+            <div class="hud-value highlight">92.2% / 91.0%</div>
           </div>
           <div class="hud-item">
             <div class="hud-label">mAP@50-95</div>
@@ -149,7 +149,7 @@
           </div>
           <div class="hud-item">
             <div class="hud-label">Inference Latency</div>
-            <div class="hud-value">1.2 – 2.8 ms</div>
+            <div class="hud-value">≈ 3 ms / image</div>
           </div>
         </div>
       </aside>
@@ -274,37 +274,68 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
   <section id="results" class="section-container">
     <div class="section-header">
       <div class="section-eyebrow">TRAINING DYNAMICS & VALIDATION CONVERGENCE</div>
-      <h2 class="section-title">Rigorous Empirical Benchmarks Across 20 Epochs</h2>
-      <p class="section-lede">The baseline detector was trained on an aggregated 6-cohort datalake and evaluated on unseen holdout validation splits under strict IoU metrics. Convergence peaked at epoch 10 with <strong>92.23% mAP@50</strong>.</p>
+      <h2 class="section-title">Validation and held-out test results</h2>
+      <p class="section-lede">The detector was trained for 20 epochs on the merged 6-cohort dataset. Validation mAP@50 peaked at epoch 10 (<strong>92.23%</strong>) and declined to 83.55% by epoch 20 while training loss kept falling. The released checkpoint holds the epoch-10 weights. Because the validation split was also used to pick that checkpoint, the separate test split (891 images, never used during training or selection) is reported alongside it.</p>
     </div>
 
     <div class="metric-strip">
       <div class="metric-card">
         <div class="metric-stat">92.23%</div>
-        <div class="metric-name">mAP@50</div>
-        <div class="metric-caption">Peak detection sensitivity at standard IoU 0.50 threshold across all classes.</div>
+        <div class="metric-name">mAP@50 (validation)</div>
+        <div class="metric-caption">Test split: 90.98%. Averaged over the 8 classes that have validation boxes.</div>
       </div>
       <div class="metric-card">
         <div class="metric-stat">88.40%</div>
-        <div class="metric-name">Precision (P)</div>
-        <div class="metric-caption">Accuracy of positive blast predictions, minimizing spurious cellular false-positives.</div>
+        <div class="metric-name">Precision (validation)</div>
+        <div class="metric-caption">Test split: 86.40%.</div>
       </div>
       <div class="metric-card">
         <div class="metric-stat">89.93%</div>
-        <div class="metric-name">Recall (R)</div>
-        <div class="metric-caption">Comprehensive capture of blast boundaries to avoid missing neoplastic cells.</div>
+        <div class="metric-name">Recall (validation)</div>
+        <div class="metric-caption">Test split: 89.73%.</div>
       </div>
       <div class="metric-card">
         <div class="metric-stat">71.86%</div>
-        <div class="metric-name">mAP@50-95</div>
-        <div class="metric-caption">Localization precision computed across multiple stringent IoU thresholds (0.50 to 0.95).</div>
+        <div class="metric-name">mAP@50-95 (validation)</div>
+        <div class="metric-caption">Test split: 70.71%. Box quality averaged over IoU thresholds 0.50 to 0.95.</div>
       </div>
       <div class="metric-card">
-        <div class="metric-stat">&lt; 2.5 ms</div>
-        <div class="metric-name">Tile Latency</div>
-        <div class="metric-caption">Average forward-pass latency per 512×512 tile under CUDA acceleration.</div>
+        <div class="metric-stat">≈ 3 ms</div>
+        <div class="metric-name">Inference per image</div>
+        <div class="metric-caption">640 px, batch 16, RTX 3060 Laptop GPU, plus ≈ 1 ms NMS. Measured with Ultralytics 8.4.31.</div>
       </div>
     </div>
+
+    <div class="table-card">
+      <div class="data-table-wrapper">
+        <table class="clean-table">
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Val AP@50</th>
+              <th>Test AP@50</th>
+              <th>Test AP@50-95</th>
+              <th>Test P</th>
+              <th>Test R</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Benign</td><td>0.987</td><td>0.961</td><td>0.657</td><td>0.889</td><td>0.944</td></tr>
+            <tr><td>Early</td><td>0.990</td><td>0.988</td><td>0.689</td><td>0.891</td><td>0.991</td></tr>
+            <tr><td>Pre</td><td>0.927</td><td>0.939</td><td>0.712</td><td>0.936</td><td>0.888</td></tr>
+            <tr><td>Pro</td><td>0.989</td><td>0.994</td><td>0.856</td><td>0.941</td><td>0.996</td></tr>
+            <tr><td>WBC</td><td>0.955</td><td>0.955</td><td>0.716</td><td>0.896</td><td>0.926</td></tr>
+            <tr><td>RBC</td><td>0.924</td><td>0.930</td><td>0.802</td><td>0.850</td><td>0.875</td></tr>
+            <tr><td>Platelets</td><td>0.790</td><td>0.716</td><td>0.480</td><td>0.732</td><td>0.667</td></tr>
+            <tr><td>Myeloblast</td><td>0.816</td><td>0.797</td><td>0.744</td><td>0.777</td><td>0.892</td></tr>
+            <tr><td>Lymphoblast</td><td colspan="5">Not evaluated: its only source (Acute-Leukemia) has no validation or test split.</td></tr>
+            <tr><td>Atypical</td><td colspan="5">Not evaluated: no training or evaluation boxes. Reserved for reviewer-assigned labels.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="section-lede"><strong>Limitations.</strong> The evaluation splits are the original per-dataset splits, so these numbers measure in-distribution performance. Leukemia-NFXZN supplies 74% of the validation boxes, so it dominates the averages. All sources are camera images of smear fields. The model has not been evaluated on whole-slide scans, and tiles are not resampled to a common microns-per-pixel scale before inference.</p>
   </section>
 
   <!-- SECTION: INTERACTIVE TABBED VISUALIZER -->
@@ -356,7 +387,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/results.png" alt="Training Convergence Curves" loading="lazy">
             <div class="figure-caption">
               <h4>Training & Validation Trajectory Across 20 Epochs</h4>
-              <p>Tracking box loss, classification loss, distribution focal loss (DFL), and mAP metrics. Convergence was attained at epoch 10 with 92.23% mAP@50 and minimal validation loss.</p>
+              <p>Tracking box loss, classification loss, distribution focal loss (DFL), and mAP metrics. Validation mAP@50 peaked at epoch 10 (92.23%). The jump in losses at epoch 11 matches Ultralytics switching off mosaic augmentation for the final 10 epochs, after which validation mAP fell to 83.55%.</p>
             </div>
           </div>
 
@@ -364,7 +395,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/labels.jpg" alt="Label Distribution and Spatial Coordinates" loading="lazy">
             <div class="figure-caption">
               <h4>Class Frequency & Spatial Bounding Box Distribution</h4>
-              <p>Correlation between bounding box sizes, coordinate centroids, and aspect ratios across the annotated 115,548 cellular instances in the aggregate training set.</p>
+              <p>Class counts, box centroids, and box sizes for the training split.</p>
             </div>
           </div>
         </div>
@@ -377,7 +408,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/confusion_matrix_normalized.png" alt="Normalized Confusion Matrix" loading="lazy">
             <div class="figure-caption">
               <h4>Normalized Confusion Matrix</h4>
-              <p>Quantifies cross-class classification fidelity. Highlights distinct separation between precursor lymphoid stages (Early vs Pre vs Pro) and baseline blood cells.</p>
+              <p>Quantifies cross-class classification fidelity. Shows how often each class is confused with the others, including the precursor lymphoid stages (Early, Pre, Pro).</p>
             </div>
           </div>
 
@@ -385,7 +416,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/confusion_matrix.png" alt="Raw Confusion Matrix" loading="lazy">
             <div class="figure-caption">
               <h4>Raw Instance Count Confusion Matrix</h4>
-              <p>Raw frequency counts showing true labels vs predicted cellular classes on holdout validation tiles.</p>
+              <p>Raw counts of true labels against predicted classes on the validation split.</p>
             </div>
           </div>
         </div>
@@ -398,7 +429,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/BoxPR_curve.png" alt="Precision-Recall Curve" loading="lazy">
             <div class="figure-caption">
               <h4>Precision-Recall (PR) Curve</h4>
-              <p>Area under the PR curve across all 10 unified classes. Demonstrates sustained precision across varying recall operating regimes at IoU 0.50.</p>
+              <p>Precision-recall curves at IoU 0.50 for the 8 classes that have validation boxes. Lymphoblast and Atypical have none.</p>
             </div>
           </div>
 
@@ -406,7 +437,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img src="assets/BoxF1_curve.png" alt="F1 Score vs Confidence Calibration" loading="lazy">
             <div class="figure-caption">
               <h4>F1 Score vs Confidence Threshold Calibration</h4>
-              <p>Identifies optimal operating threshold for production inference. The global F1 score peaks at 0.89 under confidence 0.54.</p>
+              <p>Identifies optimal operating threshold for production inference. The all-class F1 score peaks at 0.89 at confidence 0.331. The pipeline default is 0.25.</p>
             </div>
           </div>
         </div>
@@ -415,10 +446,10 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
       <!-- TAB 4: VALIDATION BATCHES -->
       <div id="tab-batches" class="tab-pane">
         <div class="batch-selector">
-          <span style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-right: 6px;">Select Cohort Tile:</span>
-          <button class="batch-btn active" data-batch="0" type="button">Batch 0 (Heterogeneous Fields)</button>
-          <button class="batch-btn" data-batch="1" type="button">Batch 1 (Dense High-Cellularity)</button>
-          <button class="batch-btn" data-batch="2" type="button">Batch 2 (Complex Clustered Fields)</button>
+          <span style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-right: 6px;">Validation batch:</span>
+          <button class="batch-btn active" data-batch="0" type="button">Batch 0</button>
+          <button class="batch-btn" data-batch="1" type="button">Batch 1</button>
+          <button class="batch-btn" data-batch="2" type="button">Batch 2</button>
         </div>
 
         <div class="visual-grid">
@@ -426,7 +457,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img id="batch-labels-img" src="assets/val_batch0_labels.jpg" alt="Ground Truth Annotations" loading="lazy">
             <div class="figure-caption">
               <h4 id="batch-labels-title">Validation Batch 0 — Annotated Ground Truth</h4>
-              <p>Expert reference labels indicating true blast subtype boundaries and standard blood lineage elements.</p>
+              <p>Reference labels from the source datasets.</p>
             </div>
           </div>
 
@@ -434,7 +465,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <img id="batch-preds-img" src="assets/val_batch0_pred.jpg" alt="Model Predictions" loading="lazy">
             <div class="figure-caption">
               <h4 id="batch-preds-title">Validation Batch 0 — YOLOv8n Predictions</h4>
-              <p>Autonomous detector predictions on the identical validation field, showing bounding boxes and confidence scores.</p>
+              <p>Model predictions on the same validation images, with confidence scores.</p>
             </div>
           </div>
         </div>
@@ -447,7 +478,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
     <div class="section-header">
       <div class="section-eyebrow">DATALAKE HARMONIZATION</div>
       <h2 class="section-title">Aggregated Multi-Cohort Datalake (25,875 Fields)</h2>
-      <p class="section-lede">Six independent hematopathology research cohorts were aggregated and mapped into a single unified 10-class taxonomy comprising 115,548 bounding-box annotations.</p>
+      <p class="section-lede">Six public Roboflow datasets were merged and remapped into one 10-class taxonomy with 115,548 bounding boxes. Each dataset keeps its original train, valid, and test split. The test splits were not used during training or checkpoint selection.</p>
     </div>
 
     <div class="table-card">
@@ -479,7 +510,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <tr>
               <td><strong>2</strong></td>
               <td><strong>Blast-Cell-Detection</strong> (YOLOv4)</td>
-              <td>Binary blast vs normal leukocyte differentiation</td>
+              <td>Binary blast vs leukocyte (blasts remapped to Pre)</td>
               <td>3,011</td>
               <td>72</td>
               <td>39</td>
@@ -499,7 +530,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <tr>
               <td><strong>4</strong></td>
               <td><strong>Blood-Cell-znm2t Differential</strong></td>
-              <td>Leukocyte differential (12 mature subtypes)</td>
+              <td>Leukocyte differential (8 subtypes, all merged into WBC)</td>
               <td>9,105</td>
               <td>389</td>
               <td>387</td>
@@ -509,7 +540,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <tr>
               <td><strong>5</strong></td>
               <td><strong>Acute-Leukemia AML/ALL</strong></td>
-              <td>Myeloblast vs Lymphoblast differentiation</td>
+              <td>Myeloblast vs Lymphoblast (train split only)</td>
               <td>3,809</td>
               <td>0</td>
               <td>0</td>
@@ -519,7 +550,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
             <tr>
               <td><strong>6</strong></td>
               <td><strong>Myeloblast-fbliw Dedicated</strong></td>
-              <td>Acute myeloid leukemia (AML) blast morphology</td>
+              <td>AML blasts (472 image-level "RBC" boxes included in totals)</td>
               <td>700</td>
               <td>200</td>
               <td>100</td>
@@ -547,7 +578,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
     <div class="section-header">
       <div class="section-eyebrow">MORPHOLOGY TAXONOMY</div>
       <h2 class="section-title">Unified 10-Class Cellular Taxonomy</h2>
-      <p class="section-lede">The model evaluates cellular characteristics including nucleocytoplasmic (N:C) ratio, chromatin condensation, cytoplasmic basophilia, and nuclear contour clefting.</p>
+      <p class="section-lede">Box counts are totals across train, valid, and test after remapping. Descriptions give the usual morphology of each class. The model learns from the labels alone and does not measure these features explicitly.</p>
     </div>
 
     <div class="taxonomy-grid">
@@ -556,7 +587,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
           <div class="tax-name">Pre B-ALL</div>
           <div class="tax-count">46,491 cells</div>
         </div>
-        <p class="tax-desc">Intermediate lymphoid blast stage. Exhibiting condensed chromatin, irregular nuclear contours, and minimal to moderate basophilic cytoplasm.</p>
+        <p class="tax-desc">Pre B-ALL blasts from Leukemia-NFXZN. Also includes 1,689 generic "blast-cell" boxes from Blast-Cell-Detection, which are not subtyped.</p>
       </div>
 
       <div class="tax-card">
@@ -580,55 +611,55 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
           <div class="tax-name">Myeloblast (AML)</div>
           <div class="tax-count">3,003 cells</div>
         </div>
-        <p class="tax-desc">Myeloid precursor blast indicative of AML. Characterized by prominent nucleoli, moderate cytoplasm, dispersed chromatin, and occasional Auer rods.</p>
+        <p class="tax-desc">AML blasts from Acute-Leukemia and Myeloblast-fbliw. In Myeloblast-fbliw the blasts are labeled "WBC" in the source and remapped here.</p>
       </div>
 
       <div class="tax-card">
         <div class="tax-header">
           <div class="tax-name">Lymphoblast</div>
-          <div class="tax-count">4,215 cells</div>
+          <div class="tax-count">3,162 cells</div>
         </div>
-        <p class="tax-desc">Generic immature lymphoid blast cells captured across cross-institutional acute leukemia datasets with variable staining artifacts.</p>
+        <p class="tax-desc">Lymphoblasts from the Acute-Leukemia dataset only. Train split only, so this class has no validation or test measurement.</p>
       </div>
 
       <div class="tax-card">
         <div class="tax-header">
           <div class="tax-name">Benign</div>
-          <div class="tax-count">14,280 cells</div>
+          <div class="tax-count">11,832 cells</div>
         </div>
-        <p class="tax-desc">Normal mature lymphocytes, monocytes, and mature granulocytes serving as negative controls to prevent false blast alarms.</p>
+        <p class="tax-desc">The non-leukemic class of the Leukemia-NFXZN B-ALL dataset.</p>
       </div>
 
       <div class="tax-card">
         <div class="tax-header">
           <div class="tax-name">WBC</div>
-          <div class="tax-count">10,589 cells</div>
+          <div class="tax-count">15,122 cells</div>
         </div>
-        <p class="tax-desc">Standard mature white blood cells from BCCD and differential cohorts: neutrophils, eosinophils, and basophils.</p>
+        <p class="tax-desc">Leukocytes from BCCD, Blood-Cell-znm2t (all 8 subtypes merged), Blast-Cell-Detection, and Acute-Leukemia.</p>
       </div>
 
       <div class="tax-card">
         <div class="tax-header">
           <div class="tax-name">RBC</div>
-          <div class="tax-count">6,842 cells</div>
+          <div class="tax-count">8,447 cells</div>
         </div>
-        <p class="tax-desc">Biconcave anucleated mature erythrocytes used for background normalization, field density assessment, and scale calibration.</p>
+        <p class="tax-desc">Erythrocytes from BCCD. Also includes 472 boxes from Myeloblast-fbliw, 465 of which cover more than 80% of the image and are image-level tags, not cells.</p>
       </div>
 
       <div class="tax-card">
         <div class="tax-header">
           <div class="tax-name">Platelets</div>
-          <div class="tax-count">2,009 cells</div>
+          <div class="tax-count">271 cells</div>
         </div>
-        <p class="tax-desc">Small thrombocyte fragments; crucial for resolving smear debris and preventing false positive small-blast classifications.</p>
+        <p class="tax-desc">Platelets from BCCD. The rarest trained class and the weakest on the test split (AP@50 0.716).</p>
       </div>
 
       <div class="tax-card">
         <div class="tax-header">
           <div class="tax-name">Atypical</div>
-          <div class="tax-count">899 cells</div>
+          <div class="tax-count">0 cells</div>
         </div>
-        <p class="tax-desc">Reactive, apoptotic, or unclassified atypical mononuclear cells flagged for human-in-the-loop expert review.</p>
+        <p class="tax-desc">No source dataset maps to this class, so the released model has never seen an example. It exists so reviewers can assign it in the review UI.</p>
       </div>
     </div>
   </section>
@@ -638,7 +669,7 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
     <div class="section-header">
       <div class="section-eyebrow">SYSTEM ARCHITECTURE</div>
       <h2 class="section-title">WSI Sliding-Window & Active Learning Loop</h2>
-      <p class="section-lede">Engineered for gigapixel digital pathology slide ingestion and human-in-the-loop experience replay fine-tuning without catastrophic forgetting.</p>
+      <p class="section-lede">Tiles whole-slide images, writes detections to a local review queue, and fine-tunes on reviewed tiles mixed with earlier data to reduce forgetting.</p>
     </div>
 
     <div class="flow-container">
@@ -651,19 +682,19 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
       <div class="flow-step">
         <div class="step-num">Step 02</div>
         <div class="step-title">Glass Filtering</div>
-        <div class="step-desc">Evaluates RGB luminance; automatically discards >80% empty slide glass areas.</div>
+        <div class="step-desc">Skips tiles where more than 80% of pixels have grayscale luminance above 220.</div>
       </div>
 
       <div class="flow-step">
         <div class="step-num">Step 03</div>
         <div class="step-title">512×512 Tiling</div>
-        <div class="step-desc">Sliding window with 25% overlap to ensure boundary cells are fully captured.</div>
+        <div class="step-desc">Sliding window with 25% overlap so cells on tile edges appear whole in at least one tile.</div>
       </div>
 
       <div class="flow-step">
         <div class="step-num">Step 04</div>
         <div class="step-title">YOLOv8n Inference</div>
-        <div class="step-desc">CUDA-accelerated 3.01M parameter forward pass with sub-2.5ms latency per patch.</div>
+        <div class="step-desc">3.01M-parameter detector, run one tile at a time.</div>
       </div>
 
       <div class="flow-step">
@@ -681,21 +712,21 @@ sha256sum best.pt                   # On Linux / macOS</code></pre>
 
     <div class="modules-grid">
       <div class="module-card">
-        <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">wsi_tiler.py</div>
+        <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">inference_pipeline.py</div>
         <h3>Gigapixel Sliding-Window Engine</h3>
-        <p>Efficiently navigates multi-gigabyte digital whole slide images. Computes cellular density masks, extracts 512×512 patches with stride overlap, and projects tile detections back to slide coordinates.</p>
+        <p>Reads whole-slide images with tiffslide, skips background tiles, extracts 512×512 patches with 25% overlap, and maps tile detections back to slide coordinates before global NMS.</p>
       </div>
 
       <div class="module-card">
         <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">replay_buffer.py</div>
         <h3>Stratified Experience Replay</h3>
-        <p>Mitigates catastrophic forgetting when pathologists correct or add annotations. Dynamically constructs balanced training subsets by oversampling underrepresented classes (e.g. Myeloblast and Atypical).</p>
+        <p>Builds each fine-tuning set from newly reviewed tiles plus a stratified sample of earlier reviewed tiles (4 old per new), with a 1.5× quota for underrepresented classes, to reduce forgetting.</p>
       </div>
 
       <div class="module-card">
-        <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">app.py & review_ui</div>
+        <div style="font-size: 11px; font-weight: 800; color: var(--primary-600); text-transform: uppercase;">app.py &amp; public/</div>
         <h3>Human-in-the-Loop Web Sandbox</h3>
-        <p>FastAPI-powered review interface. Features real-time confidence tuning, bounding-box editing, security-hardened file uploads (OWASP Top 10), and direct triggers for incremental fine-tuning.</p>
+        <p>Local FastAPI review interface with a confidence slider, box editing, and validated image uploads. Fine-tuning is started separately with <code>training_pipeline.py --mode hitl</code>.</p>
       </div>
     </div>
   </section>
@@ -769,26 +800,23 @@ for box in results[0].boxes:
     cls_name = model.names[cls_id]
     confidence = float(box.conf[0].item())
     xyxy = box.xyxy[0].tolist()
-    print(f"Detected {cls_name:<12} ({confidence:.2%}) at {xyxy}")</code></pre>
+    print(f"Detected {cls_name:&lt;12} ({confidence:.2%}) at {xyxy}")</code></pre>
         </div>
 
         <!-- CODE 3: WSI INFERENCE -->
         <div id="code-wsi" class="code-pane">
-<pre><code>from inference_pipeline import run_wsi_pipeline
+<pre><code># Command line: tiles the slide, runs detection, applies global NMS,
+# saves tiles to data/raw_tiles/ and writes detections to the SQLite review queue
+python inference_pipeline.py path/to/slide.svs
 
-# Process a gigapixel whole slide image with sliding-window tiling
-summary = run_wsi_pipeline(
-    wsi_path="path/to/bone_marrow_biopsy.svs",
-    model_path="data/models/active_model.pt",
-    output_dir="data/wsi_results",
-    tile_size=512,
-    overlap_pct=0.25,
-    conf_threshold=0.25,
-    nms_iou_threshold=0.45
-)
+# Same thing from Python
+from database import init_db
+from inference_pipeline import InferencePipeline
 
-print(f"Total tiles evaluated: {summary['total_tiles']}")
-print(f"Blasts identified across slide: {summary['total_blasts']}")</code></pre>
+init_db()
+InferencePipeline().run("path/to/slide.svs")
+# Tile size, overlap, confidence and NMS IoU come from config.py
+# (override with BLAST_TILE_SIZE, BLAST_INFERENCE_OVERLAP_PCT, ... in .env)</code></pre>
         </div>
 
         <!-- CODE 4: REVIEW SERVER -->
@@ -798,10 +826,12 @@ python app.py
 
 # Review server starts at http://127.0.0.1:8000
 # Features:
-# - Drag-and-drop blood smear upload with OWASP-hardened validation
-# - Real-time confidence threshold slider
-# - Interactive bounding box editing & deletion
-# - Trigger experience replay training loop with 1 click</code></pre>
+# - Review queue for tiles produced by inference_pipeline.py
+# - Sandbox: upload a smear image (type, size and pixel limits enforced)
+# - Confidence threshold slider, box editing and class reassignment
+
+# Fine-tune on reviewed tiles (run separately, after saving reviews)
+python training_pipeline.py --mode hitl</code></pre>
         </div>
       </div>
     </div>
