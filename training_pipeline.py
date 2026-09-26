@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import time
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -97,6 +99,43 @@ def _is_cell_box(parts: list[str]) -> bool:
     return width * height <= MAX_CELL_BOX_AREA
 
 
+HOLDOUT_EVERY = 10
+_AUGMENT_SUFFIX = re.compile(r"_(fH|fV|r\d{3})$")
+
+
+def _source_image_id(filename: str) -> str:
+    """Strip Roboflow hashes and baked-in flip/rotate suffixes.
+
+    ``ALL1_100_fH_jpg.rf.<hash>.jpg`` and ``ALL1_100_jpg.rf.<hash>.jpg`` are
+    copies of one source image and must land in the same split.
+    """
+    stem = filename.split(".rf.")[0].removesuffix("_jpg")
+    return _AUGMENT_SUFFIX.sub("", stem)
+
+
+def _in_holdout(filename: str) -> bool:
+    key = _source_image_id(filename).encode("utf-8")
+    return zlib.crc32(key) % HOLDOUT_EVERY == 0
+
+
+def _split_source(
+    ds_path: Path, split: str
+) -> tuple[Path, Path, Optional[bool]]:
+    """Return (images, labels, holdout) for one split of a source dataset.
+
+    Datasets that ship without a validation split lend about one in
+    ``HOLDOUT_EVERY`` source images to validation, so every class gets
+    measured. ``holdout`` is None when the split exists as-is, True to keep
+    only held-out images, and False to skip them.
+    """
+    train = ds_path / "train"
+    for name in ("valid", "val"):
+        if (ds_path / name / "images").exists():
+            source = train if split == "train" else ds_path / name
+            return source / "images", source / "labels", None
+    return train / "images", train / "labels", split == "valid"
+
+
 def _latest_checkpoint(prefix: str) -> Path:
     detect_dir = PROJECT_ROOT / "runs" / "detect"
     if not detect_dir.exists():
@@ -180,11 +219,9 @@ class WarmStartTrainer:
                 continue
 
             for split in ("train", "valid"):
-                src_images = ds_path / split / "images"
-                src_labels = ds_path / split / "labels"
-                if split == "valid" and not src_images.exists():
-                    src_images = ds_path / "val" / "images"
-                    src_labels = ds_path / "val" / "labels"
+                src_images, src_labels, holdout = _split_source(
+                    ds_path, split
+                )
                 if not src_images.exists():
                     continue
 
@@ -203,6 +240,11 @@ class WarmStartTrainer:
                         continue
                     label = src_labels / f"{img_file.stem}.txt"
                     if not label.exists():
+                        continue
+                    if (
+                        holdout is not None
+                        and _in_holdout(img_file.name) != holdout
+                    ):
                         continue
 
                     shutil.copy2(
