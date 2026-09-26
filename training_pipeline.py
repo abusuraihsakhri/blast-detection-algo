@@ -13,6 +13,7 @@ from typing import Optional
 
 import yaml
 from loguru import logger
+from PIL import Image
 from sqlalchemy.orm import Session
 from ultralytics import YOLO
 
@@ -82,15 +83,41 @@ def _metric_map50(results) -> float:
 MAX_CELL_BOX_AREA = 0.8
 
 
+def _to_box(parts: list[str]) -> Optional[list[str]]:
+    """Normalize one YOLO label row to [class, x_center, y_center, w, h].
+
+    Some sources store polygons (class x1 y1 x2 y2 ...), and Leukemia-NFXZN
+    mixes polygon and box rows in one file. Ultralytics reads a file with any
+    polygon row as all-polygon, which garbles the box rows, so every row is
+    converted to a plain box here. Returns None for malformed rows.
+    """
+    try:
+        values = [float(v) for v in parts[1:]]
+    except ValueError:
+        return None
+    if len(values) == 4:
+        x, y, w, h = values
+    elif len(values) >= 6 and len(values) % 2 == 0:
+        xs = [min(max(v, 0.0), 1.0) for v in values[0::2]]
+        ys = [min(max(v, 0.0), 1.0) for v in values[1::2]]
+        w, h = max(xs) - min(xs), max(ys) - min(ys)
+        x, y = min(xs) + w / 2, min(ys) + h / 2
+    else:
+        return None
+    if w <= 0 or h <= 0:
+        return None
+    return [parts[0]] + [f"{v:.6f}" for v in (x, y, w, h)]
+
+
 def _is_cell_box(parts: list[str]) -> bool:
     """Return False for YOLO label rows that are not real cell boxes.
 
     ``parts`` is one label row split on whitespace:
     [class_id, x_center, y_center, width, height], coordinates normalized 0-1.
 
-    Myeloblast-fbliw tags 465 of its 472 "RBC" boxes as near-full-frame
-    rectangles (width * height > 0.8). These are image-level tags, and they
-    currently enter training and validation as RBC targets.
+    Expects a row already normalized by ``_to_box``. Myeloblast-fbliw tags
+    465 of its 472 "RBC" boxes as near-full-frame rectangles
+    (width * height > 0.8). These are image-level tags, not cells.
     """
     try:
         width, height = float(parts[3]), float(parts[4])
@@ -134,6 +161,64 @@ def _split_source(
             source = train if split == "train" else ds_path / name
             return source / "images", source / "labels", None
     return train / "images", train / "labels", split == "valid"
+
+
+NEAR_DUPLICATE_BITS = 10
+_HASH_BANDS = NEAR_DUPLICATE_BITS + 1
+_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
+
+
+def _dhash(image: Image.Image) -> int:
+    gray = image.convert("L").resize((17, 16))
+    px = gray.tobytes()
+    bits = 0
+    for row in range(16):
+        for col in range(16):
+            if px[row * 17 + col] > px[row * 17 + col + 1]:
+                bits |= 1 << (row * 16 + col)
+    return bits
+
+
+def _orientation_free_hash(path: Path) -> int:
+    """256-bit difference hash, minimized over flips and 90° rotations."""
+    with Image.open(path) as image:
+        variants = [
+            image,
+            image.transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+            image.transpose(Image.Transpose.FLIP_TOP_BOTTOM),
+            image.transpose(Image.Transpose.ROTATE_90),
+            image.transpose(Image.Transpose.ROTATE_180),
+            image.transpose(Image.Transpose.ROTATE_270),
+        ]
+        return min(_dhash(v) for v in variants)
+
+
+def _bands(value: int) -> list[tuple[int, int]]:
+    # Two hashes within NEAR_DUPLICATE_BITS share at least one exact band.
+    width = -(-256 // _HASH_BANDS)
+    mask = (1 << width) - 1
+    return [(i, (value >> (i * width)) & mask) for i in range(_HASH_BANDS)]
+
+
+def _near_duplicates(
+    candidates: list[Path], references: list[Path]
+) -> list[Path]:
+    """Return candidates that nearly duplicate any reference image."""
+    index: dict[tuple[int, int], list[int]] = {}
+    for ref in references:
+        value = _orientation_free_hash(ref)
+        for band in _bands(value):
+            index.setdefault(band, []).append(value)
+    hits = []
+    for path in candidates:
+        value = _orientation_free_hash(path)
+        if any(
+            (value ^ ref).bit_count() <= NEAR_DUPLICATE_BITS
+            for band in _bands(value)
+            for ref in index.get(band, ())
+        ):
+            hits.append(path)
+    return hits
 
 
 def _latest_checkpoint(prefix: str) -> Path:
@@ -247,6 +332,20 @@ class WarmStartTrainer:
                     ):
                         continue
 
+                    dest_label = (
+                        self.unified_train_dir
+                        / split
+                        / "labels"
+                        / f"{ds_name}_{label.name}"
+                    )
+                    if not self._remap_and_copy_label(
+                        label, dest_label, class_map
+                    ):
+                        # Every row was an artifact; the real cell is
+                        # unlabeled, so the image would teach it as
+                        # background.
+                        dest_label.unlink()
+                        continue
                     shutil.copy2(
                         img_file,
                         self.unified_train_dir
@@ -254,30 +353,62 @@ class WarmStartTrainer:
                         / "images"
                         / f"{ds_name}_{img_file.name}",
                     )
-                    self._remap_and_copy_label(
-                        label,
-                        self.unified_train_dir
-                        / split
-                        / "labels"
-                        / f"{ds_name}_{label.name}",
-                        class_map,
-                    )
                     copied += 1
+        self._drop_leaked_train_images()
         return self._generate_yaml()
+
+    def _drop_leaked_train_images(self) -> None:
+        """Remove train images that reappear in any validation or test split.
+
+        Several sources re-export the same micrographs (Acute-Leukemia shares
+        images with Blast-Cell-Detection and Myeloblast-fbliw; BCCD with
+        Blood-Cell-znm2t), so per-dataset splits leak across datasets.
+        """
+        references = [
+            p
+            for p in (self.unified_train_dir / "valid" / "images").iterdir()
+        ]
+        for ds_name in self.remapping_rules:
+            test_dir = self.datasets_dir / ds_name / "test" / "images"
+            if test_dir.exists():
+                references.extend(test_dir.iterdir())
+        references = [
+            p for p in references if p.suffix.lower() in _IMAGE_SUFFIXES
+        ]
+        train_images = self.unified_train_dir / "train" / "images"
+        leaked = _near_duplicates(
+            sorted(train_images.iterdir()), references
+        )
+        for image in leaked:
+            image.unlink()
+            label = (
+                self.unified_train_dir
+                / "train"
+                / "labels"
+                / f"{image.stem}.txt"
+            )
+            label.unlink(missing_ok=True)
+        logger.info(
+            "Removed {} train images that duplicate validation/test images.",
+            len(leaked),
+        )
 
     def _remap_and_copy_label(
         self,
         src: Path,
         dest: Path,
         class_map: dict,
-    ) -> None:
+    ) -> bool:
+        """Write remapped boxes; False if the source had rows but none survived."""
         lines = []
+        rows = 0
         for line in src.read_text(
             encoding="utf-8"
         ).splitlines():
             parts = line.strip().split()
             if not parts:
                 continue
+            rows += 1
             try:
                 original = int(parts[0])
             except ValueError:
@@ -286,14 +417,16 @@ class WarmStartTrainer:
                     src,
                 )
                 continue
-            if original in class_map and _is_cell_box(parts):
-                parts[0] = str(class_map[original])
-                lines.append(" ".join(parts))
+            box = _to_box(parts)
+            if original in class_map and box and _is_cell_box(box):
+                box[0] = str(class_map[original])
+                lines.append(" ".join(box))
 
         dest.write_text(
             "\n".join(lines) + ("\n" if lines else ""),
             encoding="utf-8",
         )
+        return bool(lines) or rows == 0
 
     def _generate_yaml(self) -> Path:
         path = self.unified_train_dir / "dataset.yaml"

@@ -1,5 +1,6 @@
 import sys
 import types
+import zlib
 
 import pytest
 
@@ -30,16 +31,42 @@ def test_remap_drops_full_frame_boxes(tmp_path):
     )
     WarmStartTrainer()._remap_and_copy_label(src, dest, {0: 7, 1: 5, 2: 7})
     assert dest.read_text(encoding="utf-8").splitlines() == [
-        "7 0.5 0.5 0.2 0.2",
-        "7 0.4 0.4 0.3 0.3",
+        "7 0.500000 0.500000 0.200000 0.200000",
+        "7 0.400000 0.400000 0.300000 0.300000",
     ]
+
+
+def test_polygon_rows_become_boxes_in_mixed_files(tmp_path):
+    src = tmp_path / "src.txt"
+    dest = tmp_path / "dest.txt"
+    # One plain box row and one 4-corner polygon, as in Leukemia-NFXZN.
+    src.write_text(
+        "2 0.5 0.5 0.1 0.2\n"
+        "1 0.1 0.2 0.3 0.2 0.3 0.6 0.1 0.6\n",
+        encoding="utf-8",
+    )
+    WarmStartTrainer()._remap_and_copy_label(src, dest, {1: 1, 2: 2})
+    assert dest.read_text(encoding="utf-8").splitlines() == [
+        "2 0.500000 0.500000 0.100000 0.200000",
+        "1 0.200000 0.400000 0.200000 0.400000",
+    ]
+
+
+def test_large_polygon_is_not_mistaken_for_full_frame():
+    from training_pipeline import _to_box
+
+    # Read naively, fields 3-4 (0.9, 0.95) look like a full-frame box.
+    box = _to_box(["0", "0.8", "0.85", "0.9", "0.85", "0.9", "0.95", "0.8", "0.95"])
+    assert box == ["0", "0.850000", "0.900000", "0.100000", "0.100000"]
+    assert _is_cell_box(box)
 
 
 def _make_dataset(root, split, stems):
     (root / split / "images").mkdir(parents=True)
     (root / split / "labels").mkdir(parents=True)
     for stem in stems:
-        (root / split / "images" / f"{stem}.jpg").write_bytes(b"x")
+        path = root / split / "images" / f"{stem}.jpg"
+        _noise_image(path, seed=zlib.crc32(str(path).encode()))
         (root / split / "labels" / f"{stem}.txt").write_text(
             "0 0.5 0.5 0.1 0.1\n", encoding="utf-8"
         )
@@ -95,3 +122,72 @@ def test_resume_does_not_rebuild_the_merged_dataset(tmp_path, monkeypatch):
     monkeypatch.setattr(trainer, "prepare_unified_dataset", fail_rebuild)
     with pytest.raises(FileNotFoundError, match="Cannot resume"):
         trainer.train(resume=True)
+
+
+def _noise_image(path, seed):
+    import random
+
+    from PIL import Image
+
+    rng = random.Random(seed)
+    image = Image.new("L", (64, 64))
+    image.putdata([rng.randrange(256) for _ in range(64 * 64)])
+    image.convert("RGB").save(path)
+    return image
+
+
+def test_train_copies_of_eval_images_are_removed(tmp_path):
+    from PIL import Image
+
+    trainer = WarmStartTrainer()
+    trainer.datasets_dir = tmp_path / "sources"
+    trainer.unified_train_dir = tmp_path / "unified"
+    trainer.remapping_rules = {"a": {0: 0}, "b": {0: 0}}
+    for ds in ("a", "b"):
+        for split in ("train", "valid", "test"):
+            (trainer.datasets_dir / ds / split / "images").mkdir(parents=True)
+            (trainer.datasets_dir / ds / split / "labels").mkdir(parents=True)
+
+    def add(ds, split, name, seed, transform=None):
+        path = trainer.datasets_dir / ds / split / "images" / f"{name}.jpg"
+        image = _noise_image(path, seed)
+        if transform is not None:
+            image.transpose(transform).convert("RGB").save(path, quality=95)
+        (path.parent.parent / "labels" / f"{name}.txt").write_text(
+            "0 0.5 0.5 0.1 0.1\n", encoding="utf-8"
+        )
+
+    add("a", "valid", "shared", seed=1)
+    add("b", "train", "rotated_copy", seed=1, transform=Image.Transpose.ROTATE_90)
+    add("a", "test", "held_out", seed=2)
+    add("b", "train", "copy_of_test", seed=2)
+    add("b", "train", "unrelated", seed=3)
+
+    trainer.prepare_unified_dataset()
+
+    kept = sorted(
+        p.stem for p in (trainer.unified_train_dir / "train" / "images").iterdir()
+    )
+    labels = sorted(
+        p.stem for p in (trainer.unified_train_dir / "train" / "labels").iterdir()
+    )
+    assert kept == labels == ["b_unrelated"]
+
+
+def test_images_whose_only_labels_are_artifacts_are_skipped(tmp_path):
+    trainer = WarmStartTrainer()
+    trainer.datasets_dir = tmp_path / "sources"
+    trainer.unified_train_dir = tmp_path / "unified"
+    trainer.remapping_rules = {"ds": {0: 4}}
+    _make_dataset(trainer.datasets_dir / "ds", "train", ["tag_only", "cell", "empty"])
+    _make_dataset(trainer.datasets_dir / "ds", "valid", ["v"])
+    labels = trainer.datasets_dir / "ds" / "train" / "labels"
+    (labels / "tag_only.txt").write_text("0 0.5 0.5 1.0 1.0\n", encoding="utf-8")
+    (labels / "empty.txt").write_text("", encoding="utf-8")
+
+    trainer.prepare_unified_dataset()
+
+    images = sorted(
+        p.stem for p in (trainer.unified_train_dir / "train" / "images").iterdir()
+    )
+    assert images == ["ds_cell", "ds_empty"]
