@@ -6,11 +6,12 @@ import io
 import shutil
 import time
 import uuid
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Iterator, List
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,7 +31,14 @@ from config import (
 from database import SessionLocal, init_db
 from models import Annotation, Tile
 
-app = FastAPI(title="Blast Detection Review")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    _cleanup_old_sandbox_uploads()
+    yield
+
+
+app = FastAPI(title="Blast Detection Review", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -169,12 +177,6 @@ def _cleanup_old_sandbox_uploads() -> None:
                 path.unlink(missing_ok=True)
         except OSError:
             continue
-
-
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
-    _cleanup_old_sandbox_uploads()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -359,7 +361,12 @@ async def test_inference(file: UploadFile = File(...)):
     image.save(persisted_path, "JPEG", quality=95)
 
     try:
-        result = _inf_model.predict(image, conf=0.05, verbose=False)[0]
+        # Low floor on purpose: the UI confidence slider filters client-side.
+        result = (
+            await run_in_threadpool(
+                _inf_model.predict, image, conf=0.05, verbose=False
+            )
+        )[0]
     except Exception as exc:
         persisted_path.unlink(missing_ok=True)
         raise HTTPException(
