@@ -24,6 +24,9 @@ except ImportError:
     tiffslide = None
 
 
+EDGE_MARGIN_PX = 2
+
+
 def _axis_origins(length: int, tile_size: int, stride: int) -> List[int]:
     """Return origins that include both image boundaries without duplicates."""
     if length <= tile_size:
@@ -202,12 +205,25 @@ class InferencePipeline:
             )
 
             scale = settings.tile_size * wsi.downsample
+            slide_w = wsi.width * wsi.downsample
+            slide_h = wsi.height * wsi.downsample
+            margin = EDGE_MARGIN_PX * wsi.downsample
             for box in boxes:
                 x_c_n, y_c_n, w_n, h_n = box.xywhn[0].cpu().numpy()
                 gx1 = x0 + (float(x_c_n) - float(w_n) / 2.0) * scale
                 gy1 = y0 + (float(y_c_n) - float(h_n) / 2.0) * scale
                 gx2 = x0 + (float(x_c_n) + float(w_n) / 2.0) * scale
                 gy2 = y0 + (float(y_c_n) + float(h_n) / 2.0) * scale
+                # A box touching an interior tile edge is a cell cut in half.
+                # The overlap shows that cell whole in a neighboring tile, and
+                # the partial box survives NMS as a false positive.
+                if (
+                    (x0 > 0 and gx1 < x0 + margin)
+                    or (y0 > 0 and gy1 < y0 + margin)
+                    or (x0 + scale < slide_w and gx2 > x0 + scale - margin)
+                    or (y0 + scale < slide_h and gy2 > y0 + scale - margin)
+                ):
+                    continue
                 detections.append(
                     {
                         "box": [gx1, gy1, gx2, gy2],
