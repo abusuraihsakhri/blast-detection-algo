@@ -196,10 +196,10 @@ The training data come from public Roboflow Universe datasets:
 | Acute-Leukemia | [yolov4-njwoe/acute-leukemia](https://universe.roboflow.com/yolov4-njwoe/acute-leukemia/dataset/1) | CC BY 4.0 |
 | Myeloblast-fbliw | [nhung-o028n/myeloblast-fbliw](https://universe.roboflow.com/nhung-o028n/myeloblast-fbliw/dataset/1) | CC BY 4.0 |
 
-The detector is trained with [Ultralytics YOLO](https://github.com/ultralytics/ultralytics), which is licensed under AGPL-3.0.
+The detector is trained with [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) (AGPL-3.0), which is why this repository uses the same license.
 
 ## ⚖️ License & Disclaimer
 
-Distributed under the **Apache License 2.0**.
+Distributed under the **GNU Affero General Public License v3.0** (AGPL-3.0). The pipeline is built on Ultralytics YOLO, which is AGPL-3.0, and the released checkpoint carries the same license. Using this code or the weights in a network service means offering that service's source under AGPL-3.0; commercial use without that obligation needs an Ultralytics enterprise license.
 
 > **Research Use Only**: This software is intended for research, method evaluation, and algorithmic experimentation. It is not a certified diagnostic device and is not intended for primary clinical diagnosis without independent validation and regulatory approval.
