@@ -216,6 +216,12 @@ The training data come from public Roboflow Universe datasets:
 
 The detector is trained with [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) (AGPL-3.0), which is why this repository uses the same license.
 
+## Citation
+
+Sakhri, A. S. (2026). *Leukemic Blast Detection and Active Learning Pipeline* (version 4500e418284c) [Computer software]. Zenodo. [10.5281/zenodo.24565826](https://doi.org/10.5281/zenodo.24565826).
+
+The Zenodo archive contains the cited source snapshot and excludes model weights and microscopy montages.
+
 ## ⚖️ License & Disclaimer
 
 Distributed under the **GNU Affero General Public License v3.0** (AGPL-3.0). The pipeline is built on Ultralytics YOLO, which is AGPL-3.0, and the released checkpoint carries the same license. Using this code or the weights in a network service means offering that service's source under AGPL-3.0; commercial use without that obligation needs an Ultralytics enterprise license.
